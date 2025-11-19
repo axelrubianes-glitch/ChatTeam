@@ -114,7 +114,7 @@ export default function Register() {
                 <span>Totalmente gratis</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-2xl">-</span>
+                <span className="text-2xl"></span>
                 <span>Sin límites de reuniones</span>
               </div>
             </div>
