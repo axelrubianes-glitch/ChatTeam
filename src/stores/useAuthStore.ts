@@ -4,20 +4,33 @@
  */
 
 import { create } from "zustand";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import type { User } from "firebase/auth"; // 👈 ESTA es la línea clave
+import {
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  linkWithPopup,
+  type User,
+} from "firebase/auth";
+
 import { auth, googleProvider, facebookProvider } from "../lib/firebase.config";
 
 interface AuthState {
   user: User | null;
   loading: boolean;
+
+  // Logins normales
   loginWithGoogle: () => Promise<void>;
   loginWithFacebook: () => Promise<void>;
+
+  // Métodos avanzados: vincular proveedores a la cuenta actual
+  linkGoogle: () => Promise<void>;
+  linkFacebook: () => Promise<void>;
+
   logout: () => Promise<void>;
-  initAuthObserver: () => () => void; // el retorno es la función de cleanup
+  initAuthObserver: () => () => void; // cleanup
 }
 
-const useAuthStore = create<AuthState>((set) => ({
+const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   loading: true,
 
@@ -37,7 +50,39 @@ const useAuthStore = create<AuthState>((set) => ({
 
   /** Login con Facebook */
   loginWithFacebook: async () => {
-    const result = await signInWithPopup(auth, facebookProvider);
+    try {
+      console.log("[FB] Abriendo popup...");
+      const result = await signInWithPopup(auth, facebookProvider);
+      console.log("[FB] Resultado del login con Facebook:", result);
+      console.log("[FB] Usuario:", result.user);
+      set({ user: result.user });
+    } catch (error) {
+      console.error("[FB] Error en login con Facebook (store):", error);
+      throw error; // importante para que el componente lo capture
+    }
+  },
+
+  /** Vincular Google a la cuenta actual (link avanzado) */
+  linkGoogle: async () => {
+    const currentUser = get().user || auth.currentUser;
+    if (!currentUser) {
+      throw new Error("No hay usuario autenticado para vincular Google.");
+    }
+
+    const result = await linkWithPopup(currentUser, googleProvider);
+    console.log("[LINK] Google vinculado a la cuenta:", result.user);
+    set({ user: result.user });
+  },
+
+  /** Vincular Facebook a la cuenta actual (link avanzado) */
+  linkFacebook: async () => {
+    const currentUser = get().user || auth.currentUser;
+    if (!currentUser) {
+      throw new Error("No hay usuario autenticado para vincular Facebook.");
+    }
+
+    const result = await linkWithPopup(currentUser, facebookProvider);
+    console.log("[LINK] Facebook vinculado a la cuenta:", result.user);
     set({ user: result.user });
   },
 

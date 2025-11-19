@@ -36,13 +36,36 @@ export default function Login() {
   };
 
   const handleFacebookLogin = async () => {
-    try {
-      await loginWithFacebook();
-      navigate('/');
-    } catch {
-      setErrorMsg('Error al iniciar sesión con Facebook.');
+  setErrorMsg("");
+
+  try {
+    console.log("[LOGIN] Intentando inicio con Facebook...");
+    await loginWithFacebook();
+    console.log("[LOGIN] Facebook OK, navegando a Home");
+    navigate("/");
+  } catch (err: any) {
+    console.error("[LOGIN] Error al iniciar sesión con Facebook:", err);
+
+    const code = err?.code || "error-desconocido";
+    let message = "Ocurrió un error al iniciar sesión con Facebook.";
+
+    if (code === "auth/account-exists-with-different-credential") {
+      message =
+        "Este correo ya tiene una cuenta creada con otro método (Google o correo/contraseña). " +
+        "Inicia sesión con ese método y luego, desde tu perfil, vincula Facebook.";
+    } else if (code === "auth/popup-closed-by-user") {
+      message =
+        "Cerraste la ventana de Facebook antes de terminar el proceso. Vuelve a intentarlo.";
+    } else if (code === "auth/unauthorized-domain") {
+      message =
+        "El dominio de la aplicación no está autorizado para usar Facebook. Contacta al administrador.";
     }
-  };
+
+    setErrorMsg(message);
+  }
+};
+
+
 
   return (
     <section className="flex justify-center items-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-gray-50 px-4 md:px-8 py-32 md:py-40">

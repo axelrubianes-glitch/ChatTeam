@@ -3,31 +3,38 @@
  * @description Página de registro de nuevos usuarios (correo/contraseña + redes sociales)
  */
 
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../lib/firebase.config';
-import useAuthStore from '../stores/useAuthStore';
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signInWithPopup,
+  getAdditionalUserInfo,
+} from "firebase/auth";
+import {
+  auth,
+  googleProvider,
+  facebookProvider,
+} from "../lib/firebase.config";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { loginWithGoogle, loginWithFacebook } = useAuthStore();
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /** 🔹 Crear usuario con Firebase */
+  /** 🔹 Crear usuario con correo / contraseña */
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
+    setErrorMsg("");
     setLoading(true);
 
     if (password !== confirmPassword) {
-      setErrorMsg('Las contraseñas no coinciden.');
+      setErrorMsg("Las contraseñas no coinciden.");
       setLoading(false);
       return;
     }
@@ -39,17 +46,19 @@ export default function Register() {
         password
       );
       await updateProfile(userCredential.user, { displayName: name });
-      navigate('/profile');
+      navigate("/profile");
     } catch (error: any) {
       console.error(error);
-      if (error.code === 'auth/email-already-in-use') {
-        setErrorMsg('Este correo ya está registrado.');
-      } else if (error.code === 'auth/invalid-email') {
-        setErrorMsg('El correo electrónico no es válido.');
-      } else if (error.code === 'auth/weak-password') {
-        setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+      if (error.code === "auth/email-already-in-use") {
+        setErrorMsg(
+          "Este correo ya está registrado. Ve a 'Iniciar sesión' y entra con tu contraseña."
+        );
+      } else if (error.code === "auth/invalid-email") {
+        setErrorMsg("El correo electrónico no es válido.");
+      } else if (error.code === "auth/weak-password") {
+        setErrorMsg("La contraseña debe tener al menos 6 caracteres.");
       } else {
-        setErrorMsg('Error al crear la cuenta. Intenta nuevamente.');
+        setErrorMsg("Error al crear la cuenta. Intenta nuevamente.");
       }
     } finally {
       setLoading(false);
@@ -58,21 +67,65 @@ export default function Register() {
 
   /** 🔹 Registro rápido con Google */
   const handleGoogleRegister = async () => {
+    setErrorMsg("");
+
     try {
-      await loginWithGoogle();
-      navigate('/profile');
-    } catch {
-      setErrorMsg('Error al registrarse con Google.');
+      const result = await signInWithPopup(auth, googleProvider);
+      const info = getAdditionalUserInfo(result);
+
+      if (info?.isNewUser) {
+        // Usuario NUEVO con Google → lo mandamos a perfil para vincular si quiere
+        navigate("/profile");
+      } else {
+        // Ya existía una cuenta con ese Google
+        setErrorMsg(
+          "Ya tienes una cuenta registrada con este correo usando Google. " +
+            "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Google."
+        );
+      }
+    } catch (err: any) {
+      console.error("[REGISTER] Error con Google:", err);
+      const code = err?.code || "error-desconocido";
+
+      if (code === "auth/popup-closed-by-user") {
+        setErrorMsg(
+          "Cerraste la ventana de Google antes de terminar el proceso."
+        );
+      } else {
+        setErrorMsg("No se pudo completar el registro con Google.");
+      }
     }
   };
 
   /** 🔹 Registro rápido con Facebook */
   const handleFacebookRegister = async () => {
+    setErrorMsg("");
+
     try {
-      await loginWithFacebook();
-      navigate('/profile');
-    } catch {
-      setErrorMsg('Error al registrarse con Facebook.');
+      const result = await signInWithPopup(auth, facebookProvider);
+      const info = getAdditionalUserInfo(result);
+
+      if (info?.isNewUser) {
+        // Usuario NUEVO con Facebook
+        navigate("/profile");
+      } else {
+        // Ya existía una cuenta con ese Facebook
+        setErrorMsg(
+          "Ya tienes una cuenta registrada con este correo usando Facebook. " +
+            "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Facebook."
+        );
+      }
+    } catch (err: any) {
+      console.error("[REGISTER] Error con Facebook:", err);
+      const code = err?.code || "error-desconocido";
+
+      if (code === "auth/popup-closed-by-user") {
+        setErrorMsg(
+          "Cerraste la ventana de Facebook antes de terminar el proceso."
+        );
+      } else {
+        setErrorMsg("No se pudo completar el registro con Facebook.");
+      }
     }
   };
 
@@ -141,7 +194,7 @@ export default function Register() {
                   required
                   className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Tu nombre"
                 />
               </div>
@@ -155,7 +208,7 @@ export default function Register() {
                   required
                   className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="tucorreo@ejemplo.com"
                 />
               </div>
@@ -169,7 +222,7 @@ export default function Register() {
                   required
                   className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                 />
               </div>
@@ -183,7 +236,7 @@ export default function Register() {
                   required
                   className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                 />
               </div>
@@ -220,7 +273,7 @@ export default function Register() {
                     Creando cuenta...
                   </span>
                 ) : (
-                  'Crear cuenta'
+                  "Crear cuenta"
                 )}
               </button>
             </form>
@@ -262,7 +315,7 @@ export default function Register() {
             </div>
 
             <p className="text-center text-sm text-gray-600 mt-8">
-              ¿Ya tienes cuenta?{' '}
+              ¿Ya tienes cuenta?{" "}
               <Link
                 to="/login"
                 className="text-blue-600 hover:text-blue-700 font-bold hover:underline"
