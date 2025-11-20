@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -6,9 +7,10 @@ import About from "./pages/About";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import RecoverPassword from "./pages/RecoverPassword";
 import HomeLogged from "./pages/HomeLogged"; // 👈 nueva página importada
-import { useEffect } from "react";
 import useAuthStore from "./stores/useAuthStore";
+import { Navigate } from "react-router-dom";
 
 function App() {
   const { initAuthObserver, user, loading } = useAuthStore();
@@ -39,6 +41,15 @@ function App() {
           />
 
           <Route path="/about" element={<About />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Perfil (vinculación Google/Facebook ya la tienes hecha) */}
+          <Route path="/profile" element={<Profile />} />
+
+          {/* Recuperar contraseña (solo diseño, sin backend todavía) */}
+          <Route path="/recover-password" element={<RecoverPassword />} />
+
 
           {/* 👇 Protegemos login/register: si ya hay sesión, redirige al home autenticado */}
           <Route

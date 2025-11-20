@@ -1,71 +1,111 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import useAuthStore from '../stores/useAuthStore';
+// src/pages/Login.tsx
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../lib/firebase.config";
+import useAuthStore from "../stores/useAuthStore";
 
 export default function Login() {
   const { loginWithGoogle, loginWithFacebook } = useAuthStore();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
+  /** 🔹 Login con correo y contraseña */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMsg('');
+    setErrorMsg("");
 
     try {
-      console.log('Iniciando sesión con:', email, password);
-      navigate('/');
-    } catch {
-      setErrorMsg('Error al iniciar sesión. Verifica tus credenciales.');
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      navigate("/"); // o "/profile" si prefieres
+    } catch (err: any) {
+      console.error("[LOGIN] Error con correo/contraseña:", err);
+      const code = err?.code || "error-desconocido";
+
+      if (code === "auth/user-not-found") {
+        setErrorMsg(
+          "No encontramos una cuenta con este correo. Verifica los datos o regístrate."
+        );
+      } else if (code === "auth/wrong-password") {
+        setErrorMsg("La contraseña es incorrecta. Intenta de nuevo.");
+      } else if (code === "auth/invalid-email") {
+        setErrorMsg("El correo electrónico no es válido.");
+      } else if (code === "auth/too-many-requests") {
+        setErrorMsg(
+          "Demasiados intentos fallidos. Espera unos minutos antes de volver a intentar."
+        );
+      } else {
+        setErrorMsg("No pudimos iniciar sesión. Intenta nuevamente.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  /** 🔹 Login rápido con Google */
   const handleGoogleLogin = async () => {
+    setErrorMsg("");
+
     try {
       await loginWithGoogle();
-      navigate('/');
-    } catch {
-      setErrorMsg('Error al iniciar sesión con Google.');
+      navigate("/");
+    } catch (err: any) {
+      console.error("[LOGIN] Error Google:", err);
+      const code = err?.code || "error-desconocido";
+
+      if (
+        code === "auth/account-exists-with-different-credential" ||
+        code === "auth/email-already-in-use"
+      ) {
+        setErrorMsg(
+          "Ya tienes una cuenta asociada a este correo usando otro método (Facebook o correo/contraseña). Inicia sesión con ese método."
+        );
+      } else if (code === "auth/popup-closed-by-user") {
+        setErrorMsg("Cerraste la ventana de Google antes de terminar el proceso.");
+      } else {
+        setErrorMsg("No se pudo iniciar sesión con Google. Intenta de nuevo.");
+      }
     }
   };
 
+  /** 🔹 Login rápido con Facebook */
   const handleFacebookLogin = async () => {
-  setErrorMsg("");
+    setErrorMsg("");
 
-  try {
-    console.log("[LOGIN] Intentando inicio con Facebook...");
-    await loginWithFacebook();
-    console.log("[LOGIN] Facebook OK, navegando a Home");
-    navigate("/");
-  } catch (err: any) {
-    console.error("[LOGIN] Error al iniciar sesión con Facebook:", err);
+    try {
+      console.log("[LOGIN] Intentando inicio con Facebook...");
+      await loginWithFacebook();
+      console.log("[LOGIN] Facebook OK, navegando a Home");
+      navigate("/");
+    } catch (err: any) {
+      console.error("[LOGIN] Error al iniciar sesión con Facebook:", err);
 
-    const code = err?.code || "error-desconocido";
-    let message = "Ocurrió un error al iniciar sesión con Facebook.";
+      const code = err?.code || "error-desconocido";
+      let message = "Ocurrió un error al iniciar sesión con Facebook.";
 
-    if (code === "auth/account-exists-with-different-credential") {
-      message =
-        "Este correo ya tiene una cuenta creada con otro método (Google o correo/contraseña). " +
-        "Inicia sesión con ese método y luego, desde tu perfil, vincula Facebook.";
-    } else if (code === "auth/popup-closed-by-user") {
-      message =
-        "Cerraste la ventana de Facebook antes de terminar el proceso. Vuelve a intentarlo.";
-    } else if (code === "auth/unauthorized-domain") {
-      message =
-        "El dominio de la aplicación no está autorizado para usar Facebook. Contacta al administrador.";
+      if (
+        code === "auth/account-exists-with-different-credential" ||
+        code === "auth/email-already-in-use"
+      ) {
+        message =
+          "Este correo ya tiene una cuenta creada con otro método (Google o correo/contraseña). " +
+          "Inicia sesión con ese método y luego, desde tu perfil, puedes vincular Facebook.";
+      } else if (code === "auth/popup-closed-by-user") {
+        message =
+          "Cerraste la ventana de Facebook antes de terminar el proceso. Vuelve a intentarlo.";
+      } else if (code === "auth/unauthorized-domain") {
+        message =
+          "El dominio de la aplicación no está autorizado para usar Facebook. Contacta al administrador.";
+      }
+
+      setErrorMsg(message);
     }
-
-    setErrorMsg(message);
-  }
-};
-
-
+  };
 
   return (
     <section className="flex justify-center items-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-gray-50 px-4 md:px-8 py-32 md:py-40">
@@ -74,8 +114,8 @@ export default function Login() {
         {/* 🔹 Columna izquierda (branding) */}
         <div className="relative flex flex-col justify-center items-center md:items-start bg-gradient-to-br from-blue-600 to-purple-600 w-full md:w-[40%] px-10 py-16 md:py-20 text-white overflow-hidden">
           {/* Decoración de fondo */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24" />
 
           <div className="relative z-10">
             <div className="bg-white p-4 rounded-2xl shadow-lg mb-6 w-fit">
@@ -133,7 +173,7 @@ export default function Login() {
                   className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   placeholder="tucorreo@ejemplo.com"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
@@ -147,7 +187,7 @@ export default function Login() {
                   className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   placeholder="••••••••"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
 
@@ -196,23 +236,24 @@ export default function Login() {
                     Iniciando...
                   </span>
                 ) : (
-                  'Iniciar sesión'
+                  "Iniciar sesión"
                 )}
               </button>
             </form>
 
             {/* Separador mejorado */}
             <div className="flex items-center my-8">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
               <span className="px-4 text-gray-400 text-sm font-medium">
                 o continúa con
               </span>
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
             </div>
 
             {/* Botones sociales mejorados */}
             <div className="flex flex-col gap-3">
               <button
+                type="button"
                 onClick={handleGoogleLogin}
                 className="flex items-center justify-center gap-3 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all hover:scale-[1.02] font-medium"
               >
@@ -225,6 +266,7 @@ export default function Login() {
               </button>
 
               <button
+                type="button"
                 onClick={handleFacebookLogin}
                 className="flex items-center justify-center gap-3 py-3 rounded-xl bg-[#1877F2] hover:bg-[#166FE5] transition-all text-white font-medium hover:scale-[1.02] shadow-md"
               >
@@ -238,7 +280,7 @@ export default function Login() {
             </div>
 
             <p className="text-center text-sm text-gray-600 mt-8">
-              ¿No tienes cuenta?{' '}
+              ¿No tienes cuenta?{" "}
               <Link
                 to="/register"
                 className="text-blue-600 hover:text-blue-700 font-bold hover:underline"

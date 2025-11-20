@@ -5,29 +5,24 @@
 
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-  signInWithPopup,
-  getAdditionalUserInfo,
-} from "firebase/auth";
-import {
-  auth,
-  googleProvider,
-  facebookProvider,
-} from "../lib/firebase.config";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth } from "../lib/firebase.config";
+import useAuthStore from "../stores/useAuthStore";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { loginWithGoogle, loginWithFacebook } = useAuthStore();
 
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState(""); // Nombres
+  const [lastName, setLastName] = useState("");  // Apellidos
+  const [birthDate, setBirthDate] = useState(""); // Fecha de nacimiento (solo UI por ahora)
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /** 🔹 Crear usuario con correo / contraseña */
+  /** 🔹 Crear usuario con Firebase (correo + contraseña) */
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -39,19 +34,40 @@ export default function Register() {
       return;
     }
 
+    if (!firstName.trim() || !lastName.trim()) {
+      setErrorMsg("Por favor escribe tus nombres y apellidos.");
+      setLoading(false);
+      return;
+    }
+
+    if (!birthDate) {
+      setErrorMsg("Por favor selecciona tu fecha de nacimiento.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
-      await updateProfile(userCredential.user, { displayName: name });
+
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
+      await updateProfile(userCredential.user, {
+        displayName: fullName || undefined,
+      });
+
+      // Nota: por ahora la fecha de nacimiento SOLO queda en el frontend.
+      // Cuando tengan backend la pueden guardar en Firestore o en su API.
+
       navigate("/profile");
     } catch (error: any) {
       console.error(error);
       if (error.code === "auth/email-already-in-use") {
         setErrorMsg(
-          "Este correo ya está registrado. Ve a 'Iniciar sesión' y entra con tu contraseña."
+          "Este correo ya está registrado. Ve a 'Iniciar sesión' para acceder a tu cuenta."
         );
       } else if (error.code === "auth/invalid-email") {
         setErrorMsg("El correo electrónico no es válido.");
@@ -70,26 +86,23 @@ export default function Register() {
     setErrorMsg("");
 
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const info = getAdditionalUserInfo(result);
+      await loginWithGoogle();
+      navigate("/profile");
+    } catch (err: any) {
+      console.error("[REGISTER] Error Google:", err);
+      const code = err?.code || "error-desconocido";
 
-      if (info?.isNewUser) {
-        // Usuario NUEVO con Google → lo mandamos a perfil para vincular si quiere
-        navigate("/profile");
-      } else {
-        // Ya existía una cuenta con ese Google
+      if (
+        code === "auth/account-exists-with-different-credential" ||
+        code === "auth/email-already-in-use"
+      ) {
         setErrorMsg(
           "Ya tienes una cuenta registrada con este correo usando Google. " +
             "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Google."
         );
-      }
-    } catch (err: any) {
-      console.error("[REGISTER] Error con Google:", err);
-      const code = err?.code || "error-desconocido";
-
-      if (code === "auth/popup-closed-by-user") {
+      } else if (code === "auth/popup-closed-by-user") {
         setErrorMsg(
-          "Cerraste la ventana de Google antes de terminar el proceso."
+          "Cerraste la ventana de Google antes de terminar el registro."
         );
       } else {
         setErrorMsg("No se pudo completar el registro con Google.");
@@ -102,26 +115,23 @@ export default function Register() {
     setErrorMsg("");
 
     try {
-      const result = await signInWithPopup(auth, facebookProvider);
-      const info = getAdditionalUserInfo(result);
+      await loginWithFacebook();
+      navigate("/profile");
+    } catch (err: any) {
+      console.error("[REGISTER] Error Facebook:", err);
+      const code = err?.code || "error-desconocido";
 
-      if (info?.isNewUser) {
-        // Usuario NUEVO con Facebook
-        navigate("/profile");
-      } else {
-        // Ya existía una cuenta con ese Facebook
+      if (
+        code === "auth/account-exists-with-different-credential" ||
+        code === "auth/email-already-in-use"
+      ) {
         setErrorMsg(
           "Ya tienes una cuenta registrada con este correo usando Facebook. " +
             "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Facebook."
         );
-      }
-    } catch (err: any) {
-      console.error("[REGISTER] Error con Facebook:", err);
-      const code = err?.code || "error-desconocido";
-
-      if (code === "auth/popup-closed-by-user") {
+      } else if (code === "auth/popup-closed-by-user") {
         setErrorMsg(
-          "Cerraste la ventana de Facebook antes de terminar el proceso."
+          "Cerraste la ventana de Facebook antes de terminar el registro."
         );
       } else {
         setErrorMsg("No se pudo completar el registro con Facebook.");
@@ -131,13 +141,12 @@ export default function Register() {
 
   return (
     <section className="flex justify-center items-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-gray-50 px-4 md:px-8 py-32 md:py-40">
-      {/* 🔹 Contenedor principal con animación y mejor espaciado */}
+      {/* 🔹 Contenedor principal */}
       <div className="flex flex-col md:flex-row w-full max-w-[1100px] bg-white rounded-3xl shadow-2xl overflow-hidden animate-fade-in my-8">
         {/* 🔹 Columna izquierda (branding) */}
         <div className="relative flex flex-col justify-center items-center md:items-start bg-gradient-to-br from-purple-600 to-blue-600 w-full md:w-[40%] px-10 py-16 md:py-20 text-white overflow-hidden">
-          {/* Decoración de fondo */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24" />
 
           <div className="relative z-10">
             <div className="bg-white p-4 rounded-2xl shadow-lg mb-6 w-fit">
@@ -167,7 +176,7 @@ export default function Register() {
                 <span>Totalmente gratis</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-2xl"></span>
+                <span className="text-2xl">-</span>
                 <span>Sin límites de reuniones</span>
               </div>
             </div>
@@ -185,34 +194,37 @@ export default function Register() {
             </p>
 
             <form onSubmit={handleRegister} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Tu nombre"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                    Apellido
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                    placeholder="Tu apellido"
-                  />
-                </div>
+              {/* Nombres */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                  Nombres
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Tus nombres"
+                />
               </div>
 
+              {/* Apellidos */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                  Apellidos
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Tus apellidos"
+                />
+              </div>
+
+              {/* Fecha de nacimiento */}
               <div>
                 <label className="block text-gray-700 font-semibold mb-2 text-sm">
                   Fecha de nacimiento
@@ -220,13 +232,28 @@ export default function Register() {
                 <input
                   type="date"
                   required
-                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
                 />
               </div>
-              
-              {/* Campos de correo, contraseña y confirmación permanecen igual */}
 
+              {/* Correo */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  required
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tucorreo@ejemplo.com"
+                />
+              </div>
 
+              {/* Contraseña */}
               <div>
                 <label className="block text-gray-700 font-semibold mb-2 text-sm">
                   Contraseña
@@ -241,6 +268,7 @@ export default function Register() {
                 />
               </div>
 
+              {/* Confirmar contraseña */}
               <div>
                 <label className="block text-gray-700 font-semibold mb-2 text-sm">
                   Confirmar contraseña
@@ -292,16 +320,16 @@ export default function Register() {
               </button>
             </form>
 
-            {/* Separador mejorado */}
+            {/* Separador */}
             <div className="flex items-center my-8">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
               <span className="px-4 text-gray-400 text-sm font-medium">
                 o regístrate con
               </span>
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
             </div>
 
-            {/* Botones sociales mejorados */}
+            {/* Botones sociales */}
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleGoogleRegister}
