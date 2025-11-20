@@ -9,8 +9,8 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import RecoverPassword from "./pages/RecoverPassword";
 import HomeLogged from "./pages/HomeLogged"; // 👈 nueva página importada
-import { useEffect } from "react";
 import useAuthStore from "./stores/useAuthStore";
+import { Navigate } from "react-router-dom";
 
 function App() {
   const { initAuthObserver, user, loading } = useAuthStore();
