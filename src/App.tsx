@@ -11,6 +11,7 @@ import RecoverPassword from "./pages/RecoverPassword";
 import HomeLogged from "./pages/HomeLogged"; // 👈 nueva página importada
 import useAuthStore from "./stores/useAuthStore";
 import { Navigate } from "react-router-dom";
+import Meeting from "./pages/Meeting"; // 👈 IMPORTANTE: Ruta Meeting agregada
 
 function App() {
   const { initAuthObserver, user, loading } = useAuthStore();
@@ -40,6 +41,7 @@ function App() {
             element={user ? <HomeLogged /> : <Home />}
           />
 
+          {/* 👇 Rutas originales (NO borradas, NO modificadas) */}
           <Route path="/about" element={<About />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -49,7 +51,6 @@ function App() {
 
           {/* Recuperar contraseña (solo diseño, sin backend todavía) */}
           <Route path="/recover-password" element={<RecoverPassword />} />
-
 
           {/* 👇 Protegemos login/register: si ya hay sesión, redirige al home autenticado */}
           <Route
@@ -65,6 +66,12 @@ function App() {
           <Route
             path="/profile"
             element={user ? <Profile /> : <Navigate to="/login" replace />}
+          />
+
+          {/* 🔥🔥 NUEVA RUTA DE MEETING (SIN TOCAR NADA MÁS) 🔥🔥 */}
+          <Route
+            path="/meeting"
+            element={user ? <Meeting /> : <Navigate to="/login" replace />}
           />
 
           {/* 👇 Redirección por defecto */}

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-50 border-t border-gray-200 py-8 mt-12">
+    <footer className="bg-gray-50 border-t border-gray-200 py-8 mt-[-32px]">
       <div className="container mx-auto flex flex-col md:flex-row justify-around text-center md:text-left text-sm text-gray-700">
         {/* Columna 1 */}
         <div>

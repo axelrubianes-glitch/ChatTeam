@@ -60,3 +60,40 @@ button {
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out;
 }
+
+/* ANIMACIÓN TIPO iOS: BOTÓN CON REBOTE */
+
+@keyframes iosBounce {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(0.88);
+  }
+  75% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.ios-press {
+  transition: transform 0.15s ease;
+}
+
+.ios-press:active {
+  animation: iosBounce 0.35s ease;
+}
+
+
+/* Efecto LIFT (elevación sutil al hacer hover) */
+
+
+.ios-hover {
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.ios-hover:hover {
+  transform: translateY(-2px);
+}
