@@ -185,33 +185,47 @@ export default function Register() {
             </p>
 
             <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                  Nombre completo
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Tu nombre"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                    Nombre
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Tu nombre"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                    Apellido
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                    placeholder="Tu apellido"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                  Correo electrónico
+                  Fecha de nacimiento
                 </label>
                 <input
-                  type="email"
+                  type="date"
                   required
-                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tucorreo@ejemplo.com"
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                 />
               </div>
+              
+              {/* Campos de correo, contraseña y confirmación permanecen igual */}
+
 
               <div>
                 <label className="block text-gray-700 font-semibold mb-2 text-sm">
