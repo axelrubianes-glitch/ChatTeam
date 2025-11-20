@@ -4,10 +4,10 @@ import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Login from "./pages/Login";
-import Register from "./pages/Register"
+import Register from "./pages/Register";
+import Profile from "./pages/Profile";   // 👈 nuevo import
 import { useEffect } from "react";
 import useAuthStore from "./stores/useAuthStore";
-
 
 function App() {
   const { initAuthObserver } = useAuthStore();
@@ -16,6 +16,7 @@ function App() {
     const unsubscribe = initAuthObserver();
     return () => unsubscribe(); // se limpia al desmontar
   }, [initAuthObserver]);
+
   return (
     <BrowserRouter>
       <Navbar />
@@ -25,6 +26,8 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          {/* 👇 ruta de perfil */}
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </main>
       <Footer />
