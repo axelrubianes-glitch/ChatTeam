@@ -31,3 +31,4 @@ server/serviceAccountKey.json
 *.sw?
 server/serviceAccountKey.json
 server/src/serviceAccountKey.json
+.env
