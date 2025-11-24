@@ -48,9 +48,8 @@ export default function Footer() {
         </div>
 
         {/* Logo */}
-        <div className="flex flex-col justify-center items-center mt-6 md:mt-0">
-          <img src="/logo.png" alt="ChatTeam" className="w-8 h-8 mb-2" />
-          <p className="font-semibold text-blue-700">ChatTeam</p>
+        <div className="flex flex-col justify-center items-center mt-30 md:mt-30">
+          <img src="/logo.png" alt="ChatTeam" className="w-20 h-20 mb-2" />
         </div>
       </div>
     </footer>
