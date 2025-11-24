@@ -1,8 +1,14 @@
 import { Request, Response } from "express";
 import { db } from "../firebase/admin";
 
-
-/** Create meeting */
+/**
+ * Create a new meeting document.
+ * Body: { title: string, ownerUid: string }
+ *
+ * @param {Request} req
+ * @param {Response} res
+ * @returns {Promise<Response>}
+ */
 export const createMeeting = async (req: Request, res: Response) => {
   try {
     const { title, ownerUid } = req.body;
@@ -20,7 +26,13 @@ export const createMeeting = async (req: Request, res: Response) => {
   }
 };
 
-/** Get all meetings */
+/**
+ * Return all meeting documents.
+ *
+ * @param {Request} _req
+ * @param {Response} res
+ * @returns {Promise<Response>}
+ */
 export const getMeetings = async (_: Request, res: Response) => {
   try {
     const snap = await db.collection("meetings").get();

@@ -2,7 +2,14 @@
 import { Request, Response } from "express";
 import { auth } from "../firebase/admin";
 
-/** Register user */
+/**
+ * Register or update a user record using Firebase Admin Auth.
+ * Expects `uid`, `email` and optional `name` in the request body.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON result or error
+ */
 export const registerUser = async (req: Request, res: Response) => {
   try {
     const { uid, email, name } = req.body;
@@ -22,7 +29,14 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 };
 
-/** Update basic user profile */
+/**
+ * Update basic profile fields for a user.
+ * Path param: :uid
+ * Body: { displayName?: string, photoURL?: string }
+ *
+ * @param {Request} req
+ * @param {Response} res
+ */
 export const updateUserProfile = async (req: Request, res: Response) => {
   try {
     const { uid } = req.params;
@@ -37,7 +51,13 @@ export const updateUserProfile = async (req: Request, res: Response) => {
   }
 };
 
-/** Delete user */
+/**
+ * Delete a user by UID (Firebase Auth).
+ * Path param: :uid
+ *
+ * @param {Request} req
+ * @param {Response} res
+ */
 export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { uid } = req.params;
@@ -51,7 +71,13 @@ export const deleteUser = async (req: Request, res: Response) => {
   }
 };
 
-/** Generate password reset link */
+/**
+ * Generate a password reset link for an email using Firebase Admin.
+ * Expects `{ email }` in the request body.
+ *
+ * @param {Request} req
+ * @param {Response} res
+ */
 export const sendPasswordReset = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -60,7 +86,6 @@ export const sendPasswordReset = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Email is required." });
     }
 
-    // Firebase Admin genera el link oficial de reset
     const resetLink = await auth.generatePasswordResetLink(email);
 
     return res.json({

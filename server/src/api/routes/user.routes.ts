@@ -9,16 +9,17 @@ import {
 
 const router = Router();
 
-// Register
+/**
+ * /api/users routes
+ *
+ * POST /register         -> registerUser
+ * PUT  /update/:uid      -> updateUserProfile
+ * DELETE /delete/:uid    -> deleteUser
+ * POST /reset-password   -> sendPasswordReset
+ */
 router.post("/register", registerUser);
-
-// Update user
 router.put("/update/:uid", updateUserProfile);
-
-// Delete user
 router.delete("/delete/:uid", deleteUser);
-
-// Send reset password email
 router.post("/reset-password", sendPasswordReset);
 
 export default router;

@@ -29,3 +29,5 @@ server/serviceAccountKey.json
 *.njsproj
 *.sln
 *.sw?
+server/serviceAccountKey.json
+server/src/serviceAccountKey.json
