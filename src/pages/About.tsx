@@ -11,32 +11,33 @@ export default function About() {
     {
       name: "Juan Esteban Agudelo",
       role: "Product Owner & Frontend",
-      img: "https://i.pravatar.cc/300?img=12",
+      img: "/team/juan-esteban.jpg",
     },
     {
       name: "Juan Carlos Villa",
       role: "Backend Developer",
-      img: "https://i.pravatar.cc/300?img=30",
+      img: "/team/juan-carlos.jpg",
     },
     {
       name: "Axel David Rubianes",
       role: "Database Manager",
-      img: "https://i.pravatar.cc/300?img=15",
+      img: "/team/axel-rubianes.jpg",
     },
     {
       name: "Juan José Flórez",
       role: "Project Manager",
-      img: "https://i.pravatar.cc/300?img=20",
+      img: "/team/juan-jose.jpg",
     },
     {
       name: "Carlos Daniel Salinas",
       role: "Tester",
-      img: "https://i.pravatar.cc/300?img=25",
+      img: "/team/carlos-salinas.jpg",
     },
   ];
 
   return (
     <section className="min-h-screen bg-gray-100 px-4 md:px-10 py-16 flex flex-col items-center">
+      
       {/* TÍTULO PRINCIPAL */}
       <h1 className="text-3xl md:text-4xl font-semibold text-blue-700 mb-4 text-center">
         Sobre ChatTeam
@@ -83,15 +84,17 @@ export default function About() {
         Nuestro Equipo
       </h2>
 
-      <div className="
-        grid grid-cols-1 
-        sm:grid-cols-2 
-        lg:grid-cols-3 
-        gap-10 
-        w-full max-w-6xl 
-        pb-20 
-        justify-items-center
-      ">
+      <div
+        className="
+          grid grid-cols-1 
+          sm:grid-cols-2 
+          lg:grid-cols-3 
+          gap-10 
+          w-full max-w-6xl 
+          pb-20 
+          justify-items-center
+        "
+      >
         {team.map((member) => (
           <div
             key={member.name}
@@ -104,12 +107,14 @@ export default function About() {
                 className="w-full h-full object-cover rounded-full border-4 border-blue-600 shadow"
               />
 
-              <div className="
-                absolute inset-0 bg-blue-700 bg-opacity-75 rounded-full 
-                flex items-center justify-center text-white text-sm font-medium 
-                opacity-0 group-hover:opacity-100 
-                transition-opacity duration-300
-              ">
+              <div
+                className="
+                  absolute inset-0 bg-blue-700 bg-opacity-75 rounded-full 
+                  flex items-center justify-center text-white text-sm font-medium 
+                  opacity-0 group-hover:opacity-100 
+                  transition-opacity duration-300
+                "
+              >
                 {member.role}
               </div>
             </div>

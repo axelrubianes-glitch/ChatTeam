@@ -1,6 +1,8 @@
 // src/pages/RecoverPassword.tsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "../lib/firebase.config"; // 👈 ajusta la ruta si tu archivo está en otro lado
 
 export default function RecoverPassword() {
   const [email, setEmail] = useState("");
@@ -8,7 +10,7 @@ export default function RecoverPassword() {
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setInfoMsg("");
     setErrorMsg("");
@@ -18,23 +20,39 @@ export default function RecoverPassword() {
       return;
     }
 
-    // 🔹 Aquí más adelante iría la llamada real a Firebase (sendPasswordResetEmail)
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+
+    try {
+      // ✅ AQUÍ se manda el correo real desde Firebase
+      await sendPasswordResetEmail(auth, email);
+
       setInfoMsg(
-        "Si este correo está registrado, te enviaremos un enlace para restablecer tu contraseña."
+        "Si este correo está registrado, te enviamos un enlace para restablecer tu contraseña."
       );
-    }, 800);
+    } catch (error: any) {
+      console.error(error);
+
+      // Mensajes más claros según el error de Firebase
+      if (error.code === "auth/user-not-found") {
+        // Ojo: por seguridad muchas apps no revelan esto
+        setErrorMsg(
+          "Si este correo está registrado, te enviaremos un enlace para restablecer tu contraseña."
+        );
+      } else if (error.code === "auth/invalid-email") {
+        setErrorMsg("El correo ingresado no es válido.");
+      } else {
+        setErrorMsg("Error al intentar enviar el enlace. Inténtalo de nuevo.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <section className="flex justify-center items-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-gray-50 px-4 md:px-8 py-32 md:py-40">
-      {/* Contenedor principal */}
       <div className="flex flex-col md:flex-row w-full max-w-[1100px] bg-white rounded-3xl shadow-2xl overflow-hidden animate-fade-in my-8">
         {/* Columna izquierda (branding) */}
         <div className="relative flex flex-col justify-center items-center md:items-start bg-gradient-to-br from-blue-600 to-purple-600 w-full md:w-[40%] px-10 py-16 md:py-20 text-white overflow-hidden">
-          {/* decoraciones */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32" />
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24" />
 
@@ -112,29 +130,7 @@ export default function RecoverPassword() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3.5 rounded-xl transition-all font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
               >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Enviando enlace...
-                  </span>
-                ) : (
-                  "Enviar enlace"
-                )}
+                {loading ? "Enviando enlace..." : "Enviar enlace"}
               </button>
             </form>
 

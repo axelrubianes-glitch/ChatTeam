@@ -9,11 +9,12 @@ import useAuthStore from "../stores/useAuthStore";
 
 /**
  * Navbar component for ChatTeam.
- * Shows different buttons depending on user authentication state.
+ * - Sin sesión: Inicio + Registrarse / Iniciar sesión
+ * - Con sesión: Inicio + Perfil
  */
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const { user, logout, loading } = useAuthStore();
+  const { user, loading } = useAuthStore();
 
   return (
     <nav className="bg-white shadow-md fixed w-full top-0 z-50">
@@ -23,14 +24,18 @@ export default function Navbar() {
           <div className="flex-shrink-0 flex items-center">
             <Link
               to="/"
-              className="text-primary text-2xl font-bold hover:opacity-90 transition-opacity"
+              className="text-primary text-2xl font-bold hover:opacity-90 transition-opacity flex items-center gap-2"
             >
-              💬 ChatTeam
+              <span role="img" aria-label="Chat icon">
+                💬
+              </span>
+              <span>ChatTeam</span>
             </Link>
           </div>
 
           {/* ===== Menú principal (desktop) ===== */}
           <div className="hidden md:flex md:items-center md:space-x-8">
+            {/* Link Inicio */}
             <NavLink
               to="/"
               className={({ isActive }) =>
@@ -42,61 +47,31 @@ export default function Navbar() {
               Inicio
             </NavLink>
 
-            <NavLink
-              to="/about"
-              className={({ isActive }) =>
-                `hover:text-primary ${
-                  isActive ? "text-primary font-semibold" : "text-gray-700"
-                }`
-              }
-            >
-              Sobre nosotros
-            </NavLink>
-
-            <NavLink
-              to="/meeting"
-              className={({ isActive }) =>
-                `hover:text-primary ${
-                  isActive ? "text-primary font-semibold" : "text-gray-700"
-                }`
-              }
-            >
-              Mapa del sitio
-            </NavLink>
-
-            {/* ===== Acciones según autenticación ===== */}
+            {/* Acciones según autenticación */}
             {!loading && (
               <div className="flex items-center gap-3">
                 {!user ? (
                   <>
                     <Link
                       to="/register"
-                      className="border border-primary text-primary px-4 py-1.5 rounded-md hover:bg-blue-50 transition-all"
+                      className="border border-primary text-primary px-4 py-1.5 rounded-md hover:bg-blue-50 transition-all text-sm font-medium"
                     >
                       Registrarse
                     </Link>
                     <Link
                       to="/login"
-                      className="bg-primary text-white px-4 py-1.5 rounded-md hover:bg-blue-600 transition-all"
+                      className="bg-primary text-white px-4 py-1.5 rounded-md hover:bg-blue-600 transition-all text-sm font-medium"
                     >
                       Iniciar sesión
                     </Link>
                   </>
                 ) : (
-                  <>
-                    <Link
-                      to="/profile"
-                      className="border border-primary text-primary px-4 py-1.5 rounded-md hover:bg-blue-50 transition-all"
-                    >
-                      Perfil
-                    </Link>
-                    <button
-                      onClick={logout}
-                      className="bg-red-500 text-white px-4 py-1.5 rounded-md hover:bg-red-600 transition-all"
-                    >
-                      Cerrar sesión
-                    </button>
-                  </>
+                  <Link
+                    to="/profile"
+                    className="border border-primary text-primary px-4 py-1.5 rounded-md hover:bg-blue-50 transition-all text-sm font-medium"
+                  >
+                    Perfil
+                  </Link>
                 )}
               </div>
             )}
@@ -156,20 +131,6 @@ export default function Navbar() {
             >
               Inicio
             </NavLink>
-            <NavLink
-              to="/about"
-              onClick={() => setIsOpen(false)}
-              className="block text-gray-700 hover:text-primary"
-            >
-              Sobre nosotros
-            </NavLink>
-            <NavLink
-              to="/meeting"
-              onClick={() => setIsOpen(false)}
-              className="block text-gray-700 hover:text-primary"
-            >
-              Mapa del sitio
-            </NavLink>
 
             {!loading && (
               <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
@@ -178,37 +139,26 @@ export default function Navbar() {
                     <Link
                       to="/register"
                       onClick={() => setIsOpen(false)}
-                      className="border border-primary text-primary px-4 py-2 rounded-md hover:bg-blue-50 text-center"
+                      className="border border-primary text-primary px-4 py-2 rounded-md hover:bg-blue-50 text-center text-sm font-medium"
                     >
                       Registrarse
                     </Link>
                     <Link
                       to="/login"
                       onClick={() => setIsOpen(false)}
-                      className="bg-primary text-white px-4 py-2 rounded-md hover:bg-blue-600 text-center"
+                      className="bg-primary text-white px-4 py-2 rounded-md hover:bg-blue-600 text-center text-sm font-medium"
                     >
                       Iniciar sesión
                     </Link>
                   </>
                 ) : (
-                  <>
-                    <Link
-                      to="/profile"
-                      onClick={() => setIsOpen(false)}
-                      className="border border-primary text-primary px-4 py-2 rounded-md hover:bg-blue-50 text-center"
-                    >
-                      Perfil
-                    </Link>
-                    <button
-                      onClick={() => {
-                        logout();
-                        setIsOpen(false);
-                      }}
-                      className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 text-center"
-                    >
-                      Cerrar sesión
-                    </button>
-                  </>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsOpen(false)}
+                    className="border border-primary text-primary px-4 py-2 rounded-md hover:bg-blue-50 text-center text-sm font-medium"
+                  >
+                    Perfil
+                  </Link>
                 )}
               </div>
             )}

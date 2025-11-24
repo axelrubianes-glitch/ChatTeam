@@ -5,22 +5,23 @@
 
 import { create } from "zustand";
 import {
+  GoogleAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
   linkWithPopup,
   type User,
+  type UserCredential,
 } from "firebase/auth";
-
 import { auth, googleProvider, facebookProvider } from "../lib/firebase.config";
 
 interface AuthState {
   user: User | null;
   loading: boolean;
 
-  // Logins normales
-  loginWithGoogle: () => Promise<void>;
-  loginWithFacebook: () => Promise<void>;
+  // Logins normales (DEVUELVEN el UserCredential)
+  loginWithGoogle: () => Promise<UserCredential>;
+  loginWithFacebook: () => Promise<UserCredential>;
 
   // Métodos avanzados: vincular proveedores a la cuenta actual
   linkGoogle: () => Promise<void>;
@@ -44,25 +45,22 @@ const useAuthStore = create<AuthState>((set, get) => ({
 
   /** Login con Google */
   loginWithGoogle: async () => {
-    const result = await signInWithPopup(auth, googleProvider);
+    // Puedes usar googleProvider directamente, pero así también vale:
+    const provider = googleProvider ?? new GoogleAuthProvider();
+
+    const result = await signInWithPopup(auth, provider);
     set({ user: result.user });
+    return result; // 👈 IMPORTANTE para el registro
   },
 
   /** Login con Facebook */
   loginWithFacebook: async () => {
-    try {
-      console.log("[FB] Abriendo popup...");
-      const result = await signInWithPopup(auth, facebookProvider);
-      console.log("[FB] Resultado del login con Facebook:", result);
-      console.log("[FB] Usuario:", result.user);
-      set({ user: result.user });
-    } catch (error) {
-      console.error("[FB] Error en login con Facebook (store):", error);
-      throw error; // importante para que el componente lo capture
-    }
+    const result = await signInWithPopup(auth, facebookProvider);
+    set({ user: result.user });
+    return result;
   },
 
-  /** Vincular Google a la cuenta actual (link avanzado) */
+  /** Vincular Google a la cuenta actual */
   linkGoogle: async () => {
     const currentUser = get().user || auth.currentUser;
     if (!currentUser) {
@@ -74,7 +72,7 @@ const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: result.user });
   },
 
-  /** Vincular Facebook a la cuenta actual (link avanzado) */
+  /** Vincular Facebook a la cuenta actual */
   linkFacebook: async () => {
     const currentUser = get().user || auth.currentUser;
     if (!currentUser) {
