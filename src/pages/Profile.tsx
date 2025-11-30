@@ -1,5 +1,5 @@
 // src/pages/Profile.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../stores/useAuthStore";
 import {
@@ -13,7 +13,8 @@ import {
   reauthenticateWithPopup,
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase.config";
-import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { API_BASE } from "../lib/api";
 
 type Tab = "profile" | "security";
 
@@ -24,21 +25,50 @@ function splitDisplayName(displayName: string): { first: string; last: string } 
 
   const parts = clean.split(/\s+/);
 
-  // 1 sola palabra: solo nombre
-  if (parts.length === 1) {
-    return { first: parts[0], last: "" };
-  }
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  if (parts.length === 2) return { first: parts[0], last: parts[1] };
 
-  // 2 palabras: nombre + apellido
-  if (parts.length === 2) {
-    return { first: parts[0], last: parts[1] };
-  }
-
-  // 3 o más palabras: asumimos 2 nombres y el resto apellidos
   return {
-    first: parts.slice(0, 2).join(" "), // ej: "Juan Carlos"
-    last: parts.slice(2).join(" "), // ej: "Villa Gallego"
+    first: parts.slice(0, 2).join(" "),
+    last: parts.slice(2).join(" "),
   };
+}
+
+/**
+ * Fetch que adjunta Authorization: Bearer <idToken> automáticamente.
+ * - Si recibe 401/403, fuerza refresh del token y reintenta 1 vez.
+ */
+async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const currentUser = auth.currentUser;
+
+  const headers = new Headers(init.headers || {});
+  // Si vas a mandar JSON, asegura Content-Type
+  const hasBody = init.body !== undefined && init.body !== null;
+  if (hasBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  // Adjunta token si hay usuario
+  if (currentUser) {
+    const token = await currentUser.getIdToken(); // normal
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const firstTry = await fetch(input, { ...init, headers });
+
+  // Reintento con token refrescado si el backend dice no autorizado
+  if (
+    (firstTry.status === 401 || firstTry.status === 403) &&
+    auth.currentUser
+  ) {
+    const refreshed = await auth.currentUser.getIdToken(true); // force refresh
+    const retryHeaders = new Headers(headers);
+    retryHeaders.set("Authorization", `Bearer ${refreshed}`);
+
+    return fetch(input, { ...init, headers: retryHeaders });
+  }
+
+  return firstTry;
 }
 
 export default function Profile() {
@@ -51,7 +81,7 @@ export default function Profile() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [age, setAge] = useState<string>(""); // Edad
+  const [age, setAge] = useState<string>("");
   const [profileMsg, setProfileMsg] = useState("");
   const [profileError, setProfileError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -74,21 +104,22 @@ export default function Profile() {
   const [providerMsg, setProviderMsg] = useState("");
   const [providerError, setProviderError] = useState("");
 
-  const hasGoogle = !!user?.providerData.find(
-    (p) => p.providerId === "google.com"
+  const hasGoogle = useMemo(
+    () => !!user?.providerData.find((p) => p.providerId === "google.com"),
+    [user]
   );
-  const hasFacebook = !!user?.providerData.find(
-    (p) => p.providerId === "facebook.com"
+  const hasFacebook = useMemo(
+    () => !!user?.providerData.find((p) => p.providerId === "facebook.com"),
+    [user]
   );
-  const hasPassword = !!user?.providerData.find(
-    (p) => p.providerId === "password"
+  const hasPassword = useMemo(
+    () => !!user?.providerData.find((p) => p.providerId === "password"),
+    [user]
   );
 
   // Redirigir si no hay sesión
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/login");
-    }
+    if (!loading && !user) navigate("/login");
   }, [user, loading, navigate]);
 
   // Rellenar los campos cuando cargue el usuario (Auth + Backend + Firestore)
@@ -96,51 +127,46 @@ export default function Profile() {
     const loadProfile = async () => {
       if (!user) return;
 
-      // 1) Datos base desde Firebase Auth
+      // 1) Auth
       const { first, last } = splitDisplayName(user.displayName || "");
       setFirstName(first);
       setLastName(last);
       setEmail(user.email || "");
 
-      // 2) Intentar traer datos desde tu backend (registro manual)
+      // 2) Backend (si existe GET /api/users/:uid)
       try {
-        const res = await fetch(
-          `http://localhost:4000/api/users/${user.uid}`
-        );
+        const res = await authFetch(`${API_BASE}/api/users/${user.uid}`);
         if (res.ok) {
           const data = (await res.json()) as any;
 
-          if (data.name) {
-            const { first: bf, last: bl } = splitDisplayName(data.name);
+          if (data?.name) {
+            const { first: bf, last: bl } = splitDisplayName(String(data.name));
             setFirstName(bf || first);
             setLastName(bl || last);
           }
-
-          if (data.age !== undefined && data.age !== null) {
+          if (data?.age !== undefined && data?.age !== null) {
             setAge(String(data.age));
           }
         }
       } catch (err) {
-        console.error("[PROFILE] Error cargando datos del backend:", err);
+        console.error("[PROFILE] Backend load failed:", err);
       }
 
-      // 3) Sobrescribir con lo que haya en Firestore (para compatibilidad)
+      // 3) Firestore
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
         if (snap.exists()) {
           const data = snap.data() as any;
-
-          if (data.firstName || data.lastName) {
+          if (data?.firstName || data?.lastName) {
             setFirstName(data.firstName ?? first);
             setLastName(data.lastName ?? last);
           }
-
-          if (data.age !== undefined && data.age !== null) {
+          if (data?.age !== undefined && data?.age !== null) {
             setAge(String(data.age));
           }
         }
       } catch (err) {
-        console.error("[PROFILE] Error cargando datos de Firestore:", err);
+        console.error("[PROFILE] Firestore load failed:", err);
       }
     };
 
@@ -177,59 +203,51 @@ export default function Profile() {
     setSavingProfile(true);
     try {
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const uid = auth.currentUser.uid;
 
-      // 1) Actualizar nombre en Firebase Auth
-      await updateProfile(auth.currentUser, {
-        displayName: fullName,
-      });
+      // 1) Firebase Auth
+      await updateProfile(auth.currentUser, { displayName: fullName });
 
-      // 2) Guardar datos extra en Firestore
+      // 2) Firestore (merge)
       try {
         await setDoc(
-          doc(db, "users", auth.currentUser.uid),
+          doc(db, "users", uid),
           {
             firstName: firstName.trim(),
             lastName: lastName.trim(),
-            email: email.trim(),
+            email: (email || "").trim(),
             ...(ageNumber !== null ? { age: ageNumber } : {}),
           },
           { merge: true }
         );
       } catch (firestoreError) {
-        console.error(
-          "[PROFILE] Error al actualizar datos extra en Firestore:",
-          firestoreError
-        );
+        console.error("[PROFILE] Firestore update failed:", firestoreError);
       }
 
-      // 3) Actualizar también en tu backend
+      // 3) Backend (usa tus rutas)
       try {
-        await fetch(
-          `http://localhost:4000/api/users/${auth.currentUser.uid}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              uid: auth.currentUser.uid,
-              email: email.trim(),
-              name: fullName,
-              age: ageNumber,
-            }),
-          }
-        );
+        const res = await authFetch(`${API_BASE}/api/users/update/${uid}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            uid,
+            email: (email || "").trim(),
+            name: fullName,
+            age: ageNumber,
+          }),
+        });
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          console.warn("[PROFILE] Backend update not ok:", res.status, txt);
+        }
       } catch (backendError) {
-        console.error(
-          "[PROFILE] Error al sincronizar con backend:",
-          backendError
-        );
+        console.error("[PROFILE] Backend update failed:", backendError);
       }
 
       setProfileMsg("Perfil actualizado correctamente.");
     } catch (error) {
-      console.error("[PROFILE] Error al actualizar perfil (Auth):", error);
-      setProfileError(
-        "No se pudo actualizar tu perfil. Intenta nuevamente en unos segundos."
-      );
+      console.error("[PROFILE] Auth update failed:", error);
+      setProfileError("No se pudo actualizar tu perfil. Intenta nuevamente.");
     } finally {
       setSavingProfile(false);
     }
@@ -243,7 +261,8 @@ export default function Profile() {
     setPasswordMsg("");
     setPasswordError("");
 
-    if (!auth.currentUser) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
       setPasswordError("No hay sesión activa.");
       return;
     }
@@ -260,20 +279,19 @@ export default function Profile() {
 
     setChangingPassword(true);
     try {
-      await updatePassword(auth.currentUser, newPassword);
+      // Si el token está viejo, Firebase puede lanzar requires-recent-login
+      await updatePassword(currentUser, newPassword);
       setPasswordMsg("Tu contraseña se actualizó correctamente.");
       setNewPassword("");
       setConfirmNewPassword("");
     } catch (error: any) {
-      console.error("[PASSWORD] Error al cambiar contraseña:", error);
-      if (error.code === "auth/requires-recent-login") {
+      console.error("[PASSWORD] Error:", error);
+      if (error?.code === "auth/requires-recent-login" || error?.code === "auth/user-token-expired") {
         setPasswordError(
           "Por seguridad, vuelve a iniciar sesión y luego intenta cambiar tu contraseña."
         );
       } else {
-        setPasswordError(
-          "No se pudo cambiar la contraseña. Intenta nuevamente."
-        );
+        setPasswordError("No se pudo cambiar la contraseña. Intenta nuevamente.");
       }
     } finally {
       setChangingPassword(false);
@@ -281,7 +299,10 @@ export default function Profile() {
   };
 
   // ============================
-  // 3) ELIMINAR CUENTA
+  // 3) ELIMINAR CUENTA (password)
+  // - Backend primero (con token)
+  // - Luego deleteUser
+  // - NO hacemos deleteDoc en cliente (evita 'insufficient permissions')
   // ============================
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,16 +319,16 @@ export default function Profile() {
       setDeleteError("Escribe tu contraseña para confirmar.");
       return;
     }
-
     if (deletePassword !== deleteConfirmPassword) {
       setDeleteError("Las contraseñas no coinciden.");
       return;
     }
 
-    const uid = currentUser.uid; // 👈 guardamos el UID antes de borrar
+    const uid = currentUser.uid;
 
     setDeleting(true);
     try {
+      // Reauth (password)
       if (currentUser.email) {
         const credential = EmailAuthProvider.credential(
           currentUser.email,
@@ -316,39 +337,38 @@ export default function Profile() {
         await reauthenticateWithCredential(currentUser, credential);
       }
 
-      // 1) Borrar usuario en Auth
+      // Fuerza refresh del token (para no caer en user-token-expired)
+      await currentUser.getIdToken(true);
+
+      // 1) Backend DELETE primero (con authFetch)
+      const res = await authFetch(`${API_BASE}/api/users/delete/${uid}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Backend DELETE failed: ${res.status} ${txt}`);
+      }
+
+      // 2) Borrar usuario en Auth
       await deleteUser(currentUser);
-
-      // 2) Intentar borrar documento en Firestore
-      try {
-        await deleteDoc(doc(db, "users", uid));
-      } catch (err) {
-        console.error("[DELETE] Error al borrar doc en Firestore:", err);
-      }
-
-      // 3) Intentar borrar en tu backend
-      try {
-        await fetch(`http://localhost:4000/api/users/${uid}`, {
-          method: "DELETE",
-        });
-      } catch (err) {
-        console.error("[DELETE] Error al borrar usuario en backend:", err);
-      }
 
       setDeleteMsg("Tu cuenta ha sido eliminada correctamente.");
       await logout();
       navigate("/");
     } catch (error: any) {
-      console.error("[DELETE] Error al eliminar cuenta:", error);
-      if (error.code === "auth/wrong-password") {
+      console.error("[DELETE] Error:", error);
+      if (error?.code === "auth/wrong-password") {
         setDeleteError("La contraseña es incorrecta.");
-      } else if (error.code === "auth/requires-recent-login") {
+      } else if (
+        error?.code === "auth/requires-recent-login" ||
+        error?.code === "auth/user-token-expired"
+      ) {
         setDeleteError(
           "Por seguridad, vuelve a iniciar sesión y luego intenta eliminar tu cuenta."
         );
       } else {
         setDeleteError(
-          "No se pudo eliminar la cuenta. Intenta nuevamente en unos segundos."
+          "No se pudo eliminar la cuenta. Revisa el backend (DELETE) e intenta de nuevo."
         );
       }
     } finally {
@@ -356,8 +376,13 @@ export default function Profile() {
     }
   };
 
-
-  // Eliminar cuenta para Google / Facebook
+  // ============================
+  // 4) ELIMINAR CUENTA (Google/Facebook)
+  // - Reauth popup
+  // - Refresh token
+  // - Backend DELETE primero
+  // - deleteUser
+  // ============================
   const handleDeleteAccountProvider = async () => {
     setDeleteMsg("");
     setDeleteError("");
@@ -368,70 +393,57 @@ export default function Profile() {
       return;
     }
 
-    const uid = currentUser.uid; // 👈 guardamos el UID
+    const uid = currentUser.uid;
 
     setDeleting(true);
     try {
-      let provider;
+      let provider: GoogleAuthProvider | FacebookAuthProvider;
 
-      if (hasGoogle) {
-        provider = new GoogleAuthProvider();
-      } else if (hasFacebook) {
-        provider = new FacebookAuthProvider();
-      } else {
-        setDeleteError(
-          "No se pudo detectar el proveedor de tu cuenta. Cierra sesión y vuelve a entrar."
-        );
-        setDeleting(false);
+      if (hasGoogle) provider = new GoogleAuthProvider();
+      else if (hasFacebook) provider = new FacebookAuthProvider();
+      else {
+        setDeleteError("No se detectó el proveedor. Cierra sesión y vuelve a entrar.");
         return;
       }
 
-      // 1) Reautenticar con popup del proveedor
+      // 1) Reauth con popup
       await reauthenticateWithPopup(currentUser, provider);
 
-      // 2) Borrar usuario en Auth
+      // 2) Fuerza refresh token
+      await currentUser.getIdToken(true);
+
+      // 3) Backend primero
+      const res = await authFetch(`${API_BASE}/api/users/delete/${uid}`, { method: "DELETE" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Backend DELETE failed: ${res.status} ${txt}`);
+      }
+
+      // 4) Borrar Auth
       await deleteUser(currentUser);
-
-      // 3) Intentar borrar documento en Firestore
-      try {
-        await deleteDoc(doc(db, "users", uid));
-      } catch (err) {
-        console.error("[DELETE] Error al borrar doc en Firestore:", err);
-      }
-
-      // 4) Intentar borrar en tu backend
-      try {
-        await fetch(`http://localhost:4000/api/users/${uid}`, {
-          method: "DELETE",
-        });
-      } catch (err) {
-        console.error("[DELETE] Error al borrar usuario en backend:", err);
-      }
 
       setDeleteMsg("Tu cuenta ha sido eliminada correctamente.");
       await logout();
       navigate("/");
     } catch (error: any) {
-      console.error("[DELETE] Error al eliminar cuenta con proveedor:", error);
-      if (error.code === "auth/popup-closed-by-user") {
+      console.error("[DELETE] Provider delete error:", error);
+      if (error?.code === "auth/popup-closed-by-user") {
         setDeleteError("Cerraste la ventana antes de terminar. Intenta de nuevo.");
-      } else if (error.code === "auth/requires-recent-login") {
-        setDeleteError(
-          "Por seguridad, vuelve a iniciar sesión y luego intenta eliminar tu cuenta."
-        );
+      } else if (
+        error?.code === "auth/requires-recent-login" ||
+        error?.code === "auth/user-token-expired"
+      ) {
+        setDeleteError("Por seguridad, vuelve a iniciar sesión y luego intenta eliminar tu cuenta.");
       } else {
-        setDeleteError(
-          "No se pudo eliminar la cuenta. Intenta nuevamente en unos segundos."
-        );
+        setDeleteError("No se pudo eliminar la cuenta. Revisa el backend (DELETE) e intenta de nuevo.");
       }
     } finally {
       setDeleting(false);
     }
   };
 
-
   // ============================
-  // 4) SERVICIOS VINCULADOS
+  // 5) SERVICIOS VINCULADOS
   // ============================
   const handleLinkGoogle = async () => {
     setProviderMsg("");
@@ -442,16 +454,12 @@ export default function Profile() {
     } catch (error: any) {
       console.error("[LINK GOOGLE]", error);
       if (
-        error.code === "auth/credential-already-in-use" ||
-        error.code === "auth/email-already-in-use"
+        error?.code === "auth/credential-already-in-use" ||
+        error?.code === "auth/email-already-in-use"
       ) {
-        setProviderError(
-          "Este correo ya está utilizado en otra cuenta. No se pudo vincular Google."
-        );
+        setProviderError("Este correo ya está utilizado en otra cuenta.");
       } else {
-        setProviderError(
-          "No se pudo vincular Google en este momento. Intenta más tarde."
-        );
+        setProviderError("No se pudo vincular Google en este momento.");
       }
     }
   };
@@ -465,23 +473,16 @@ export default function Profile() {
     } catch (error: any) {
       console.error("[LINK FACEBOOK]", error);
       if (
-        error.code === "auth/credential-already-in-use" ||
-        error.code === "auth/email-already-in-use"
+        error?.code === "auth/credential-already-in-use" ||
+        error?.code === "auth/email-already-in-use"
       ) {
-        setProviderError(
-          "Este correo ya está utilizado en otra cuenta. No se pudo vincular Facebook."
-        );
+        setProviderError("Este correo ya está utilizado en otra cuenta.");
       } else {
-        setProviderError(
-          "No se pudo vincular Facebook en este momento. Intenta más tarde."
-        );
+        setProviderError("No se pudo vincular Facebook en este momento.");
       }
     }
   };
 
-  // ============================
-  // 5) LOGOUT
-  // ============================
   const handleLogout = async () => {
     await logout();
     navigate("/");
@@ -498,9 +499,7 @@ export default function Profile() {
   return (
     <section className="min-h-screen w-full bg-gray-50 px-4 md:px-8 py-24 md:py-28 flex justify-center">
       <div className="w-full max-w-5xl bg-white rounded-3xl shadow-xl p-6 md:p-10">
-        <h1 className="text-3xl font-bold text-gray-900 mb-1">
-          Perfil de usuario
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-1">Perfil de usuario</h1>
         <p className="text-sm text-gray-500 mb-6">
           Sesión iniciada como{" "}
           <span className="font-semibold">{user.displayName || user.email}</span>.
@@ -509,19 +508,21 @@ export default function Profile() {
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-6 flex gap-6 text-sm">
           <button
-            className={`pb-3 border-b-2 ${activeTab === "profile"
+            className={`pb-3 border-b-2 ${
+              activeTab === "profile"
                 ? "border-blue-600 text-blue-600 font-semibold"
                 : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+            }`}
             onClick={() => setActiveTab("profile")}
           >
             Editar perfil
           </button>
           <button
-            className={`pb-3 border-b-2 ${activeTab === "security"
+            className={`pb-3 border-b-2 ${
+              activeTab === "security"
                 ? "border-blue-600 text-blue-600 font-semibold"
                 : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+            }`}
             onClick={() => setActiveTab("security")}
           >
             Control de cuenta
@@ -691,19 +692,12 @@ export default function Profile() {
                     <p className="text-sm text-gray-600">
                       Tu cuenta está conectada con{" "}
                       <span className="font-semibold">
-                        {hasGoogle
-                          ? "Google"
-                          : hasFacebook
-                            ? "Facebook"
-                            : "un proveedor externo"}
+                        {hasGoogle ? "Google" : hasFacebook ? "Facebook" : "un proveedor externo"}
                       </span>
                       .
                     </p>
                     <p className="text-sm text-gray-600 mt-2">
-                      La contraseña se gestiona desde ese servicio. Entra a la
-                      configuración de seguridad de{" "}
-                      {hasGoogle ? "tu cuenta de Google" : "tu cuenta de Facebook"}{" "}
-                      para cambiarla.
+                      La contraseña se gestiona desde ese servicio.
                     </p>
                   </div>
                 )}
@@ -730,8 +724,7 @@ export default function Profile() {
                     )}
 
                     <p className="text-sm text-red-800 mb-4">
-                      Esta acción es permanente. Se eliminarán tus datos de
-                      acceso. Escribe tu contraseña para confirmar.
+                      Esta acción es permanente. Escribe tu contraseña para confirmar.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -754,9 +747,7 @@ export default function Profile() {
                           type="password"
                           className="w-full bg-white border border-red-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
                           value={deleteConfirmPassword}
-                          onChange={(e) =>
-                            setDeleteConfirmPassword(e.target.value)
-                          }
+                          onChange={(e) => setDeleteConfirmPassword(e.target.value)}
                         />
                       </div>
                     </div>
@@ -795,14 +786,9 @@ export default function Profile() {
                     <p className="text-sm text-red-800 mb-4">
                       Tu cuenta está conectada con{" "}
                       <span className="font-semibold">
-                        {hasGoogle
-                          ? "Google"
-                          : hasFacebook
-                            ? "Facebook"
-                            : "un proveedor externo"}
+                        {hasGoogle ? "Google" : hasFacebook ? "Facebook" : "un proveedor externo"}
                       </span>
-                      . Para eliminarla, primero confirmaremos tu identidad con
-                      ese servicio.
+                      . Para eliminarla, confirmaremos tu identidad con ese servicio.
                     </p>
 
                     <button
@@ -818,15 +804,14 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Columna derecha: servicios vinculados + logout */}
+          {/* Columna derecha */}
           <div className="space-y-6">
             <div className="bg-gray-50 rounded-2xl p-5 md:p-6 border border-gray-100">
               <h2 className="text-lg font-semibold mb-2 text-gray-900">
                 Servicios vinculados
               </h2>
               <p className="text-sm text-gray-500 mb-4">
-                Puedes añadir o revisar los métodos que usas para entrar a
-                ChatTeam.
+                Puedes añadir o revisar los métodos que usas para entrar a ChatTeam.
               </p>
 
               {providerError && (
@@ -840,15 +825,15 @@ export default function Profile() {
                 </div>
               )}
 
-              {/* Google */}
               <button
                 type="button"
                 onClick={hasGoogle ? undefined : handleLinkGoogle}
                 disabled={hasGoogle}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm mb-3 ${hasGoogle
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm mb-3 ${
+                  hasGoogle
                     ? "bg-green-50 border-green-200 text-green-700 cursor-default"
                     : "bg-white border-gray-200 hover:bg-gray-50"
-                  }`}
+                }`}
               >
                 <span className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center">
@@ -858,30 +843,28 @@ export default function Profile() {
                       className="w-4 h-4"
                     />
                   </span>
-                  {hasGoogle
-                    ? "Google ya está vinculado"
-                    : "Conectar Google a mi cuenta"}
+                  {hasGoogle ? "Google ya está vinculado" : "Conectar Google a mi cuenta"}
                 </span>
               </button>
 
-              {/* Facebook */}
               <button
                 type="button"
                 onClick={hasFacebook ? undefined : handleLinkFacebook}
                 disabled={hasFacebook}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm ${hasFacebook
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm ${
+                  hasFacebook
                     ? "bg-blue-50 border-blue-200 text-blue-700 cursor-default"
                     : "bg-white border-gray-200 hover:bg-gray-50"
-                  }`}
+                }`}
               >
                 <span className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center">
                     <img
-                      src="https://www.svgrepo.com/show/475647/facebook-color.svg" alt="Facebook"
+                      src="https://www.svgrepo.com/show/475647/facebook-color.svg"
+                      alt="Facebook"
                       className="w-4 h-4"
                     />
                   </span>
-
                   {hasFacebook
                     ? "Facebook ya está vinculado"
                     : "Conectar Facebook a mi cuenta"}
