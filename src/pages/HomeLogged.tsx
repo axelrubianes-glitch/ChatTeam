@@ -1,52 +1,93 @@
-/**
- * @file HomeLogged.tsx
- * @description Página de inicio para usuarios con sesión activa.
- */
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { getMeeting } from "../lib/meetings";
 
-import { Link } from "react-router-dom";
-import useAuthStore from "../stores/useAuthStore";
+function extractRoomId(input: string) {
+  const v = (input || "").trim();
+  const m1 = v.match(/\/meeting\/([A-Za-z0-9]{4,12})/);
+  if (m1?.[1]) return m1[1].toUpperCase();
+  return v.toUpperCase();
+}
 
 export default function HomeLogged() {
-  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string>("");
+
+  function generateRoomId(): string {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+
+  function handleCreateMeeting() {
+    const roomId = generateRoomId();
+    navigate(`/meeting/${roomId}?new=1`);
+  }
+
+  async function handleJoinMeeting(e: React.FormEvent) {
+    e.preventDefault();
+    setJoinError("");
+
+    const rid = extractRoomId(joinCode);
+    if (!rid) return;
+
+    setJoining(true);
+    try {
+      const meeting = await getMeeting(rid);
+
+      if (!meeting || meeting.active === false) {
+        setJoinError("Esa reunión no existe (o ya terminó). Verifica el ID.");
+        return;
+      }
+
+      navigate(`/meeting/${rid}`);
+    } catch {
+      setJoinError("No pude validar la reunión en Firestore. Revisa login/reglas.");
+    } finally {
+      setJoining(false);
+    }
+  }
 
   return (
-    <section className="flex flex-col items-center justify-center min-h-screen w-full bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100 px-6 py-24 md:py-32 animate-fade-in">
-      {/* ==== Contenedor principal ==== */}
-      <div className="bg-white/60 backdrop-blur-md shadow-xl rounded-3xl px-10 py-16 md:px-20 md:py-20 text-center max-w-4xl w-full border border-gray-100">
-        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <section className="max-w-5xl mx-auto px-4 pt-32 pb-20 flex flex-col items-center text-center">
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
           Comunicación sin <span className="text-blue-600">límites</span>
-        </h2>
+        </h1>
 
-        <p className="text-gray-600 text-lg md:text-xl mb-10">
-          Reúnete y trabaja con tu equipo estés donde estés gracias a{" "}
-          <span className="font-semibold text-blue-600">ChatTeam</span>.
-        </p>
-
-        {/* ==== Botones principales ==== */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
-          <Link
-            to="/meeting"
-            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold shadow-md hover:shadow-xl hover:scale-105 transition-all"
+        <div className="flex flex-col sm:flex-row gap-4 mb-3">
+          <button
+            type="button"
+            onClick={handleCreateMeeting}
+            className="px-8 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 shadow-md"
           >
             Crear reunión
-          </Link>
+          </button>
 
-          <Link
-            to="/join"
-            className="bg-gray-100 border-2 border-gray-200 text-gray-800 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-200 hover:border-gray-300 transition-all"
-          >
-            Unirse
-          </Link>
+          <form onSubmit={handleJoinMeeting} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+            <input
+              type="text"
+              placeholder="Código o link (Ej: ABC123)"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              className="px-3 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-60 bg-white"
+            />
+            <button
+              type="submit"
+              disabled={joining}
+              className="px-6 py-3 rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 font-semibold disabled:opacity-60"
+            >
+              {joining ? "Validando..." : "Unirse"}
+            </button>
+          </form>
         </div>
 
-        {/* ==== Indicadores / beneficios ==== */}
-        <div className="flex flex-wrap justify-center gap-6 text-gray-500 text-sm">
-          <span>✔️ Reuniones ilimitadas</span>
-          <span>✔️ Encriptadas end-to-end</span>
-          <span>✔️ Calidad HD</span>
-          <span>✔️ Gratis para todos los usuarios</span>
-        </div>
-      </div>      
-    </section>
+        {joinError && (
+          <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-xl">
+            {joinError}
+          </div>
+        )}
+      </section>
+    </main>
   );
 }

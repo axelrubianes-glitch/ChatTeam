@@ -13,6 +13,7 @@ import {
 import { auth, db } from "../lib/firebase.config"; // 👈 añadimos db
 import { doc, setDoc } from "firebase/firestore"; // 👈 Firestore
 import useAuthStore from "../stores/useAuthStore";
+import { API_BASE } from "../lib/api";
 
 type FieldErrors = {
   firstName: string;
@@ -140,20 +141,21 @@ export default function Register() {
       );
 
       // 3) También al backend (opcional)
-      try {
-        await fetch("http://localhost:4000/api/users/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            uid: userCredential.user.uid,
-            email: userCredential.user.email,
-            name: fullName,
-            age: ageNumber,
-          }),
-        });
-      } catch (syncError) {
-        console.error("[REGISTER] Error sincronizando con backend:", syncError);
-      }
+
+try {
+  await fetch(`${API_BASE}/api/users/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      uid: userCredential.user.uid,
+      email: userCredential.user.email,
+      name: fullName,
+      age: ageNumber,
+    }),
+  });
+} catch (syncError) {
+  console.error("[REGISTER] Error sincronizando con backend:", syncError);
+}
 
       navigate("/profile");
     } catch (error: any) {
