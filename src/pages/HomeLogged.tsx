@@ -1,58 +1,48 @@
-// src/pages/HomeLogged.tsx
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { getMeeting } from "../lib/meetings";
 
-const CHAT_BASE = import.meta.env.VITE_CHAT_BASE ?? "http://localhost:4001";
+function extractRoomId(input: string) {
+  const v = (input || "").trim();
+  const m1 = v.match(/\/meeting\/([A-Za-z0-9]{4,12})/);
+  if (m1?.[1]) return m1[1].toUpperCase();
+  return v.toUpperCase();
+}
 
 export default function HomeLogged() {
   const navigate = useNavigate();
-
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string>("");
 
-  // Genera un ID tipo ABC123
   function generateRoomId(): string {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
-  // 👉 CREAR REUNIÓN (NO valida nada, solo navega como host)
   function handleCreateMeeting() {
     const roomId = generateRoomId();
-    // Marcamos que este usuario es el creador con ?new=1
     navigate(`/meeting/${roomId}?new=1`);
   }
 
-  // 👉 UNIRSE A REUNIÓN EXISTENTE (sí valida contra chat-server)
   async function handleJoinMeeting(e: React.FormEvent) {
     e.preventDefault();
     setJoinError("");
 
-    // Normalizamos a mayúsculas
-    const trimmed = joinCode.trim().toUpperCase();
-    if (!trimmed) return;
+    const rid = extractRoomId(joinCode);
+    if (!rid) return;
 
     setJoining(true);
     try {
-      const res = await fetch(
-        `${CHAT_BASE}/rooms/${encodeURIComponent(trimmed)}/exists`
-      );
-      if (!res.ok) throw new Error("Rooms API not available");
+      const meeting = await getMeeting(rid);
 
-      const data: { ok: boolean; roomId: string; exists: boolean } =
-        await res.json();
-
-      if (!data.exists) {
+      if (!meeting || meeting.active === false) {
         setJoinError("Esa reunión no existe (o ya terminó). Verifica el ID.");
-        return; // ❌ NO navegamos
+        return;
       }
 
-      // ✅ Sala encontrada → navegamos sin query extra
-      navigate(`/meeting/${trimmed}`);
+      navigate(`/meeting/${rid}`);
     } catch {
-      setJoinError(
-        "No pude validar la reunión. Revisa que chat-server esté corriendo."
-      );
+      setJoinError("No pude validar la reunión en Firestore. Revisa login/reglas.");
     } finally {
       setJoining(false);
     }
@@ -65,7 +55,6 @@ export default function HomeLogged() {
           Comunicación sin <span className="text-blue-600">límites</span>
         </h1>
 
-        {/* BOTONES PRINCIPALES */}
         <div className="flex flex-col sm:flex-row gap-4 mb-3">
           <button
             type="button"
@@ -75,13 +64,10 @@ export default function HomeLogged() {
             Crear reunión
           </button>
 
-          <form
-            onSubmit={handleJoinMeeting}
-            className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center"
-          >
+          <form onSubmit={handleJoinMeeting} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
             <input
               type="text"
-              placeholder="Código de reunión (ABC123)"
+              placeholder="Código o link (Ej: ABC123)"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
               className="px-3 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-60 bg-white"
@@ -96,20 +82,11 @@ export default function HomeLogged() {
           </form>
         </div>
 
-        {/* Mensaje de error al UNIRSE */}
         {joinError && (
           <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-xl">
             {joinError}
           </div>
         )}
-
-        {/* Ventajas / bullets */}
-        <div className="mt-10 flex flex-wrap justify-center gap-6 text-sm text-slate-600">
-          <span>✔ Reuniones ilimitadas</span>
-          <span>✔ Encriptadas end-to-end</span>
-          <span>✔ Calidad HD</span>
-          <span>✔ Gratis para todos los usuarios</span>
-        </div>
       </section>
     </main>
   );

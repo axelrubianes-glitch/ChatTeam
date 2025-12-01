@@ -1,182 +1,286 @@
-// src/pages/Meeting.tsx
-/**
- * @file Meeting.tsx
- * @description Meeting room with ID + realtime chat via Socket.IO
- */
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  TbMicrophone,
-  TbCamera,
-  TbMessageCircle,
-  TbPhoneOff,
-} from "react-icons/tb";
+import { TbMicrophone, TbCamera, TbMessageCircle, TbPhoneOff } from "react-icons/tb";
 import useAuthStore from "../stores/useAuthStore";
 import { getChatSocket, type JoinAck } from "../lib/chatSocket";
+import {
+  createMeetingDoc,
+  getMeeting,
+  joinMeetingFirestore,
+  leaveMeetingFirestore,
+  listenParticipants,
+  type Participant,
+} from "../lib/meetings";
 
-type Msg = {
-  id: string;
-  roomId: string;
-  uid: string;
-  name: string;
-  text: string;
-  ts: number;
-};
+type Msg = { id: string; roomId: string; uid: string; name: string; text: string; ts: number };
 
 export default function Meeting() {
-  const params = useParams<{ roomId: string }>();
+  const { roomId: raw } = useParams<{ roomId: string }>();
   const [searchParams] = useSearchParams();
+  const isCreate = searchParams.get("new") === "1" || searchParams.get("host") === "1";
+
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  // ID tal como viene en la URL
-  const rawRoomId = params.roomId ?? "";
-  // Normalizado a MAYÚSCULAS y sin espacios
-  const roomId = useMemo(
-    () => rawRoomId.trim().toUpperCase(),
-    [rawRoomId]
-  );
+  const roomId = useMemo(() => (raw || "").trim().toUpperCase(), [raw]);
 
-  // 👇 Este flag indica si ESTE usuario tiene permiso para CREAR la sala
-  // Acepta tanto ?new=1 como ?host=1 (por compatibilidad)
-  const canCreate =
-    searchParams.get("new") === "1" || searchParams.get("host") === "1";
+  const me = useMemo<Participant>(() => {
+    return {
+      uid: user?.uid || "",
+      name: user?.displayName || user?.email || "Guest",
+    };
+  }, [user]);
 
-  const [status, setStatus] = useState<"connecting" | "ok" | "error">(
-    "connecting"
-  );
+  // Estado reunión (Firestore)
+  const [status, setStatus] = useState<"connecting" | "ok" | "error">("connecting");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Estado chat (Socket)
+  const [chatStatus, setChatStatus] = useState<"connecting" | "ok" | "error">("connecting");
+  const [chatErrorMsg, setChatErrorMsg] = useState("");
+
   const [messages, setMessages] = useState<Msg[]>([]);
   const [pending, setPending] = useState("");
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [fsReady, setFsReady] = useState(false);
 
-  // Evitar que hagamos join dos veces por culpa del modo estricto de React
-  const joinedRef = useRef(false);
+  // Tokens para hacer effects “StrictMode-safe”
+  const fsTokenRef = useRef(0);
+  const socketTokenRef = useRef(0);
 
-  const me = useMemo(
-    () => ({
-      uid: user?.uid || "anon",
-      name: user?.displayName || user?.email || "Guest",
-    }),
-    [user]
-  );
+  const leaveCalledRef = useRef(false);
 
-  // Link limpio (sin ?new=1 / ?host=1) para copiar
-  const cleanUrl = useMemo(
-    () => `${window.location.origin}/meeting/${roomId}`,
-    [roomId]
-  );
+  // Guardar “si era create” SOLO al entrar por primera vez a esa room
+  const initialRoomRef = useRef("");
+  const initialCreateRef = useRef(false);
 
+  const leave = () => navigate("/", { replace: true });
+
+  // normaliza URL a mayúscula
   useEffect(() => {
-    // Si no hay roomId → mandamos al inicio
     if (!roomId) {
-      navigate("/", { replace: true });
+      leave();
       return;
     }
+    if (raw && raw !== roomId) {
+      navigate(`/meeting/${roomId}${window.location.search}`, { replace: true });
+    }
+  }, [roomId, raw, navigate]);
 
-    // Si viene en minúsculas, normalizamos la URL a mayúsculas
-    if (rawRoomId && rawRoomId !== roomId) {
-      navigate(`/meeting/${roomId}${window.location.search}`, {
-        replace: true,
-      });
-      return;
+  // cuando cambia de room, resetea estados
+  useEffect(() => {
+    if (!roomId) return;
+
+    if (initialRoomRef.current !== roomId) {
+      initialRoomRef.current = roomId;
+      initialCreateRef.current = isCreate;
+
+      setStatus("connecting");
+      setErrorMsg("");
+      setFsReady(false);
+
+      setChatStatus("connecting");
+      setChatErrorMsg("");
+
+      setMessages([]);
+      setParticipants([]);
+      setPending("");
+
+      leaveCalledRef.current = false;
     }
+  }, [roomId, isCreate]);
+
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId);
+      alert("ID copiado ✅");
+    } catch {
+      alert("No se pudo copiar el ID.");
+    }
+  };
+
+  // 1) Firestore: crear/validar + join + listener participants
+  useEffect(() => {
+    if (!roomId || !me.uid) return;
+
+    const myToken = ++fsTokenRef.current; // invalida intentos previos
+    setStatus("connecting");
+    setErrorMsg("");
+
+    let unsub: (() => void) | null = null;
+
+    (async () => {
+      try {
+        // create/validación
+        if (initialCreateRef.current) {
+          const existing = await getMeeting(roomId);
+          if (!existing) await createMeetingDoc(roomId, me);
+        } else {
+          const meeting = await getMeeting(roomId);
+          if (!meeting || meeting.active === false) {
+            if (fsTokenRef.current !== myToken) return;
+            setStatus("error");
+            setErrorMsg("Esa reunión no existe o ya terminó. Verifica el ID.");
+            return;
+          }
+        }
+
+        // join
+        await joinMeetingFirestore(roomId, me);
+
+        // listener
+        unsub = listenParticipants(roomId, (p) => {
+          if (fsTokenRef.current !== myToken) return;
+          setParticipants(p);
+        });
+
+        if (fsTokenRef.current !== myToken) return;
+        setFsReady(true);
+        setStatus("ok");
+      } catch (err) {
+        console.error("🔥 Firestore error:", err);
+        if (fsTokenRef.current !== myToken) return;
+
+        setStatus("error");
+        setErrorMsg("No pude entrar a la reunión (Firestore). Revisa reglas/login.");
+      }
+    })();
+
+    // solo antes de cerrar pestaña
+    const onUnload = () => {
+      if (leaveCalledRef.current) return;
+      leaveCalledRef.current = true;
+      leaveMeetingFirestore(roomId, me).catch(() => {});
+    };
+    window.addEventListener("beforeunload", onUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", onUnload);
+      unsub?.();
+    };
+  }, [roomId, me.uid, me.name]);
+
+  // 2) Socket: join chat + mensajes (NO bloquea la reunión)
+  useEffect(() => {
+    if (!roomId || !me.uid) return;
+    if (!fsReady) return;
+
+    const myToken = ++socketTokenRef.current;
+
+    setChatStatus("connecting");
+    setChatErrorMsg("");
 
     const socket = getChatSocket();
+    socket.connect(); // fuerza conexión si quedó dormido
 
-    const handleMessage = (payload: Msg) => {
+    const onMsg = (payload: Msg) => {
+      if (socketTokenRef.current !== myToken) return;
       if (payload.roomId !== roomId) return;
       setMessages((prev) => [...prev, payload]);
     };
 
-    const handleConnect = () => {
-      if (joinedRef.current) return; // ya hicimos join
-      joinedRef.current = true;
+    const tryJoin = () => {
+      if (socketTokenRef.current !== myToken) return;
 
-      setStatus("connecting");
-      setErrorMsg("");
+      const createFlag = initialCreateRef.current;
 
       socket.emit(
         "room:join",
-        { roomId, create: canCreate, user: me },
+        { roomId, user: { uid: me.uid, name: me.name }, create: createFlag },
         (ack: JoinAck) => {
-          if (!ack.ok) {
-            setStatus("error");
+          if (socketTokenRef.current !== myToken) return;
 
+          if (!ack.ok) {
+            // Si el host aún no conectó, reintenta
             if (ack.error === "ROOM_NOT_FOUND") {
-              setErrorMsg(
-                "Esa reunión no existe o ya terminó. Verifica el ID."
-              );
-            } else if (
-              typeof ack.error === "string" &&
-              (ack.error.includes("full") || ack.error.includes("Room is full"))
-            ) {
-              setErrorMsg("La sala está llena (máximo 10 usuarios).");
-            } else {
-              setErrorMsg(
-                "No se pudo unir/crear la reunión. Revisa chat-server."
-              );
+              setChatStatus("connecting");
+              setChatErrorMsg("Esperando al host para activar el chat...");
+              window.setTimeout(() => {
+                if (socketTokenRef.current === myToken) tryJoin();
+              }, 1200);
+              return;
             }
+
+            setChatStatus("error");
+            setChatErrorMsg(
+              ack.error === "ROOM_FULL"
+                ? "La sala está llena (máximo 10 usuarios)."
+                : "No se pudo unir al chat."
+            );
             return;
           }
 
-          setStatus("ok");
+          setChatStatus("ok");
+          setChatErrorMsg("");
 
-          // Si veníamos como creador (?new=1 / ?host=1),
-          // limpiamos el query para que el link quede bonito
-          if (canCreate) {
+          if (createFlag) {
             navigate(`/meeting/${roomId}`, { replace: true });
           }
         }
       );
     };
 
-    const handleDisconnect = () => {
-      setStatus("connecting");
-      joinedRef.current = false;
+    const onConnect = () => {
+      if (socketTokenRef.current !== myToken) return;
+      tryJoin();
     };
 
-    socket.on("chat:message", handleMessage);
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
+    const onConnectError = (e: any) => {
+      console.error("🔥 socket connect_error:", e);
+      if (socketTokenRef.current !== myToken) return;
 
-    // Si ya está conectado el socket, hacemos join inmediato
-    if (socket.connected) handleConnect();
+      setChatStatus("error");
+      setChatErrorMsg("No se pudo conectar con chat-server. Revisa VITE_CHAT_BASE y que el server esté corriendo.");
+    };
+
+    socket.on("chat:message", onMsg);
+    socket.on("connect", onConnect);
+    socket.on("connect_error", onConnectError);
+
+    // si ya estaba conectado, intenta join
+    if (socket.connected) tryJoin();
 
     return () => {
-      socket.off("chat:message", handleMessage);
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-      joinedRef.current = false;
+      socket.off("chat:message", onMsg);
+      socket.off("connect", onConnect);
+      socket.off("connect_error", onConnectError);
+      // NO hacemos leave aquí para no romper por StrictMode en DEV
     };
-  }, [roomId, rawRoomId, canCreate, me, navigate]);
+  }, [roomId, me.uid, me.name, fsReady, navigate]);
+
+  const handleLeave = async () => {
+    if (leaveCalledRef.current) {
+      leave();
+      return;
+    }
+    leaveCalledRef.current = true;
+
+    try {
+      getChatSocket().emit("room:leave", { roomId, uid: me.uid });
+      await leaveMeetingFirestore(roomId, me);
+    } catch {
+      // igual salimos
+    } finally {
+      leave();
+    }
+  };
 
   const send = (e: React.FormEvent) => {
     e.preventDefault();
-    if (status !== "ok") return;
+    if (chatStatus !== "ok") return;
 
     const text = pending.trim();
     if (!text) return;
 
-    getChatSocket().emit("chat:send", { roomId, text, user: me });
+    getChatSocket().emit("chat:send", { roomId, text, user: { uid: me.uid, name: me.name } });
     setPending("");
   };
 
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(cleanUrl);
-      alert("Link copiado ✅");
-    } catch {
-      alert("No se pudo copiar el link.");
-    }
-  };
-
-  const leave = () => navigate("/", { replace: true });
+  const others = participants.filter((p) => p.uid !== me.uid);
 
   return (
     <section className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 pt-28 pb-10 flex gap-6">
-        {/* COLUMNA IZQUIERDA: “video” */}
         <div className="flex-1 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -190,11 +294,7 @@ export default function Meeting() {
                     : "bg-amber-50 text-amber-700"
                 }`}
               >
-                {status === "ok"
-                  ? "Conectado"
-                  : status === "error"
-                  ? "Error"
-                  : "Conectando..."}
+                {status === "ok" ? "En sala" : status === "error" ? "Error" : "Entrando..."}
               </span>
             </div>
 
@@ -206,32 +306,41 @@ export default function Meeting() {
 
               <button
                 type="button"
-                onClick={copyLink}
-                disabled={status !== "ok"}
-                className="text-sm px-4 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium disabled:opacity-50"
+                onClick={copyId}
+                className="text-sm px-4 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
               >
-                Copiar link
+                Copiar ID
               </button>
             </div>
           </div>
 
           {status === "error" && (
             <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-              {errorMsg || "No se pudo conectar."}{" "}
+              {errorMsg || "No se pudo entrar."}{" "}
               <button onClick={leave} className="underline font-semibold">
                 Volver al inicio
               </button>
             </div>
           )}
 
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-full aspect-video max-h-[70vh] bg-[#1F2940] rounded-2xl shadow-2xl relative overflow-hidden">
-              <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full bg-black/30 text-white">
-                Tú: {me.name}
+          {/* Tiles */}
+          <div className="flex-1">
+            <div className={`grid gap-4 ${others.length === 0 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"}`}>
+              <div className="aspect-video max-h-[70vh] bg-[#1F2940] rounded-2xl shadow-2xl relative overflow-hidden">
+                <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full bg-black/30 text-white">
+                  Tú: {me.name}
+                </div>
+                <div className="absolute bottom-3 left-4 text-sm text-slate-100">{me.name}</div>
               </div>
-              <div className="absolute bottom-3 left-4 text-sm text-slate-100">
-                {me.name}
-              </div>
+
+              {others.map((u) => (
+                <div key={u.uid} className="aspect-video max-h-[70vh] bg-[#25324D] rounded-2xl shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-3 left-3 text-xs px-3 py-1 rounded-full bg-black/30 text-white">
+                    Participante
+                  </div>
+                  <div className="absolute bottom-3 left-4 text-sm text-slate-100">{u.name}</div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -246,22 +355,40 @@ export default function Meeting() {
               <button className="p-2 rounded-lg hover:bg-slate-100">
                 <TbMessageCircle className="w-6 h-6 text-slate-700" />
               </button>
+
               <button
-                onClick={leave}
+                onClick={handleLeave}
                 className="px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold flex items-center gap-2 hover:bg-red-700"
               >
                 <TbPhoneOff className="w-5 h-5" />
-                Finalizar
+                Salir
               </button>
             </div>
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: CHAT */}
+        {/* Chat */}
         <aside className="hidden lg:flex w-[340px] bg-white border border-slate-200 rounded-2xl flex-col">
-          <div className="px-4 py-3 border-b border-slate-100">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">Chat</h2>
+            <span
+              className={`text-[11px] px-2 py-1 rounded-full ${
+                chatStatus === "ok"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : chatStatus === "error"
+                  ? "bg-red-50 text-red-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {chatStatus === "ok" ? "Conectado" : chatStatus === "error" ? "Sin chat" : "Conectando..."}
+            </span>
           </div>
+
+          {chatErrorMsg && (
+            <div className="mx-4 mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+              {chatErrorMsg}
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
             {messages.length === 0 ? (
@@ -273,16 +400,10 @@ export default function Meeting() {
                   <div
                     key={m.id}
                     className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
-                      self
-                        ? "ml-auto bg-blue-600 text-white"
-                        : "mr-auto bg-slate-100 text-slate-900"
+                      self ? "ml-auto bg-blue-600 text-white" : "mr-auto bg-slate-100 text-slate-900"
                     }`}
                   >
-                    {!self && (
-                      <div className="text-[11px] font-semibold mb-0.5 opacity-80">
-                        {m.name}
-                      </div>
-                    )}
+                    {!self && <div className="text-[11px] font-semibold mb-0.5 opacity-80">{m.name}</div>}
                     <div>{m.text}</div>
                   </div>
                 );
@@ -290,22 +411,19 @@ export default function Meeting() {
             )}
           </div>
 
-          <form
-            onSubmit={send}
-            className="px-4 py-3 border-t border-slate-100 flex gap-2"
-          >
+          <form onSubmit={send} className="px-4 py-3 border-t border-slate-100 flex gap-2">
             <input
               type="text"
               value={pending}
               onChange={(e) => setPending(e.target.value)}
               placeholder="Escribe un mensaje..."
               className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={status !== "ok"}
+              disabled={chatStatus !== "ok"}
             />
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
-              disabled={status !== "ok"}
+              disabled={chatStatus !== "ok"}
             >
               Enviar
             </button>
