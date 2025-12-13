@@ -266,11 +266,10 @@ export default function Login() {
                   aria-describedby={
                     fieldErrors.email ? "login-email-error" : undefined
                   }
-                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    fieldErrors.email
+                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${fieldErrors.email
                       ? "border-red-400 focus:border-red-500"
                       : "border-gray-200 focus:border-blue-500"
-                  }`}
+                    }`}
                   placeholder="tucorreo@ejemplo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -294,11 +293,10 @@ export default function Login() {
                   Contraseña
                 </label>
                 <div
-                  className={`flex items-center bg-gray-50 border-2 rounded-xl px-3 py-1 focus-within:bg-white transition-all ${
-                    fieldErrors.password
+                  className={`flex items-center bg-gray-50 border-2 rounded-xl px-3 py-1 focus-within:bg-white transition-all ${fieldErrors.password
                       ? "border-red-400 focus-within:border-red-500"
                       : "border-gray-200 focus-within:border-blue-500"
-                  }`}
+                    }`}
                 >
                   <input
                     id="login-password"
@@ -317,12 +315,11 @@ export default function Login() {
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     className="p-2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                    aria-label={
-                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-                    }
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    aria-pressed={showPassword}
+                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
                     {showPassword ? (
-                      // ojo abierto
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -335,7 +332,6 @@ export default function Login() {
                         <circle cx="12" cy="12" r="3" />
                       </svg>
                     ) : (
-                      // ojo tachado
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -348,6 +344,7 @@ export default function Login() {
                       </svg>
                     )}
                   </button>
+
                 </div>
                 {fieldErrors.password && (
                   <p
