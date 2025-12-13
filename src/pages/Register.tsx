@@ -142,20 +142,20 @@ export default function Register() {
 
       // 3) También al backend (opcional)
 
-try {
-  await fetch(`${API_BASE}/api/users/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      uid: userCredential.user.uid,
-      email: userCredential.user.email,
-      name: fullName,
-      age: ageNumber,
-    }),
-  });
-} catch (syncError) {
-  console.error("[REGISTER] Error sincronizando con backend:", syncError);
-}
+      try {
+        await fetch(`${API_BASE}/api/users/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: userCredential.user.uid,
+            email: userCredential.user.email,
+            name: fullName,
+            age: ageNumber,
+          }),
+        });
+      } catch (syncError) {
+        console.error("[REGISTER] Error sincronizando con backend:", syncError);
+      }
 
       navigate("/profile");
     } catch (error: any) {
@@ -210,7 +210,7 @@ try {
         await auth.signOut();
         setErrorMsg(
           "Este correo de Google ya tiene una cuenta en ChatTeam. " +
-            "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Google."
+          "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Google."
         );
         return;
       }
@@ -226,7 +226,7 @@ try {
       ) {
         setErrorMsg(
           "Este correo ya tiene una cuenta en ChatTeam. " +
-            "Inicia sesión con tu correo y contraseña y luego vincula Google desde tu perfil."
+          "Inicia sesión con tu correo y contraseña y luego vincula Google desde tu perfil."
         );
       } else if (code === "auth/popup-closed-by-user") {
         setErrorMsg(
@@ -267,7 +267,7 @@ try {
         await auth.signOut();
         setErrorMsg(
           "Este correo de Facebook ya tiene una cuenta en ChatTeam. " +
-            "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Facebook."
+          "No necesitas registrarte de nuevo: usa la opción 'Iniciar sesión' con Facebook."
         );
         return;
       }
@@ -283,7 +283,7 @@ try {
       ) {
         setErrorMsg(
           "Este correo ya tiene una cuenta en ChatTeam. " +
-            "Inicia sesión con tu correo y contraseña y luego vincula Facebook desde tu perfil."
+          "Inicia sesión con tu correo y contraseña y luego vincula Facebook desde tu perfil."
         );
       } else if (code === "auth/popup-closed-by-user") {
         setErrorMsg(
@@ -372,11 +372,10 @@ try {
                   aria-describedby={
                     fieldErrors.firstName ? "firstName-error" : undefined
                   }
-                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    fieldErrors.firstName
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-gray-200 focus:border-blue-500"
-                  }`}
+                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${fieldErrors.firstName
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-gray-200 focus:border-blue-500"
+                    }`}
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Tus nombres"
@@ -407,11 +406,10 @@ try {
                   aria-describedby={
                     fieldErrors.lastName ? "lastName-error" : undefined
                   }
-                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    fieldErrors.lastName
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-gray-200 focus:border-blue-500"
-                  }`}
+                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${fieldErrors.lastName
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-gray-200 focus:border-blue-500"
+                    }`}
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Tus apellidos"
@@ -439,11 +437,10 @@ try {
                   required
                   aria-invalid={!!fieldErrors.age}
                   aria-describedby={fieldErrors.age ? "age-error" : undefined}
-                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    fieldErrors.age
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-gray-200 focus:border-blue-500"
-                  }`}
+                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${fieldErrors.age
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-gray-200 focus:border-blue-500"
+                    }`}
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
                   placeholder="Ej: 20"
@@ -471,11 +468,10 @@ try {
                   aria-describedby={
                     fieldErrors.email ? "email-error" : undefined
                   }
-                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    fieldErrors.email
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-gray-200 focus:border-blue-500"
-                  }`}
+                  className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${fieldErrors.email
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-gray-200 focus:border-blue-500"
+                    }`}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tucorreo@ejemplo.com"
@@ -504,11 +500,10 @@ try {
                     aria-describedby={
                       fieldErrors.password ? "password-error" : undefined
                     }
-                    className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 pr-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                      fieldErrors.password
-                        ? "border-red-400 focus:border-red-500"
-                        : "border-gray-200 focus:border-blue-500"
-                    }`}
+                    className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 pr-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${fieldErrors.password
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-gray-200 focus:border-blue-500"
+                      }`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -516,16 +511,13 @@ try {
 
                   <button
                     type="button"
-                    aria-label={
-                      showPassword
-                        ? "Ocultar contraseña"
-                        : "Mostrar contraseña"
-                    }
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    aria-pressed={showPassword}
+                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     onClick={() => setShowPassword((prev) => !prev)}
                   >
                     {showPassword ? (
-                      // ojo abierto
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -539,14 +531,9 @@ try {
                           strokeLinejoin="round"
                           d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                         />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                     ) : (
-                      // ojo tachado
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -563,6 +550,7 @@ try {
                       </svg>
                     )}
                   </button>
+
                 </div>
                 {fieldErrors.password && (
                   <p id="password-error" className="mt-1 text-xs text-red-600">
@@ -590,11 +578,10 @@ try {
                         ? "confirmPassword-error"
                         : undefined
                     }
-                    className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 pr-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                      fieldErrors.confirmPassword
-                        ? "border-red-400 focus:border-red-500"
-                        : "border-gray-200 focus:border-blue-500"
-                    }`}
+                    className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 pr-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${fieldErrors.confirmPassword
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-gray-200 focus:border-blue-500"
+                      }`}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
@@ -602,18 +589,13 @@ try {
 
                   <button
                     type="button"
-                    aria-label={
-                      showConfirmPassword
-                        ? "Ocultar contraseña"
-                        : "Mostrar contraseña"
-                    }
+                    aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    aria-pressed={showConfirmPassword}
+                    title={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    onClick={() =>
-                      setShowConfirmPassword((prev) => !prev)
-                    }
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
                   >
                     {showConfirmPassword ? (
-                      // ojo abierto
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -627,14 +609,9 @@ try {
                           strokeLinejoin="round"
                           d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                         />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                     ) : (
-                      // ojo tachado
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -651,6 +628,7 @@ try {
                       </svg>
                     )}
                   </button>
+
                 </div>
                 {fieldErrors.confirmPassword && (
                   <p
